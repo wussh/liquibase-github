@@ -1,0 +1,500 @@
+# HOW-TO: Liquibase + Docker + GitHub Actions
+
+Panduan langkah demi langkah — dari setup awal sampai deploy production.
+
+---
+
+## Daftar Isi
+
+1. [Prerequisites](#1-prerequisites)
+2. [Setup Pertama Kali (Local)](#2-setup-pertama-kali-local)
+3. [Membuat Changeset Baru](#3-membuat-changeset-baru)
+4. [Menjalankan Migrasi Lokal](#4-menjalankan-migrasi-lokal)
+5. [Rollback Changeset](#5-rollback-changeset)
+6. [Setup GitHub Secrets](#6-setup-github-secrets)
+7. [Setup Environment Protection (Manual Approval)](#7-setup-environment-protection-manual-approval)
+8. [Deploy via GitHub Actions](#8-deploy-via-github-actions)
+9. [Troubleshooting](#9-troubleshooting)
+10. [Referensi Perintah](#10-referensi-perintah)
+
+---
+
+## 1. Prerequisites
+
+Pastikan tools berikut sudah terinstall di mesin lokal:
+
+| Tool | Versi Minimal | Cek |
+|---|---|---|
+| Docker | 20.x | `docker --version` |
+| Docker Compose | v2.x | `docker compose version` |
+| Git | 2.x | `git --version` |
+
+> [!NOTE]
+> Liquibase **tidak perlu diinstall** secara lokal — semua dijalankan via Docker container.
+
+---
+
+## 2. Setup Pertama Kali (Local)
+
+### Langkah 1 — Clone Repository
+
+```bash
+git clone <url-repo>
+cd liquibase-github
+```
+
+### Langkah 2 — Build Custom Liquibase Image
+
+Image ini berisi Liquibase + MySQL JDBC driver (hanya perlu sekali):
+
+```bash
+DOCKER_BUILDKIT=0 docker compose build liquibase
+```
+
+Verifikasi image berhasil dibuat:
+
+```bash
+docker images | grep liquibase-mysql
+# liquibase-mysql   4.27   ...
+```
+
+### Langkah 3 — Jalankan MySQL & Adminer
+
+```bash
+docker compose up -d mysql adminer
+```
+
+Cek status container:
+
+```bash
+docker compose ps
+# NAME                 STATUS
+# liquibase-adminer    Up
+# liquibase-mysql      Up (healthy)
+```
+
+> [!IMPORTANT]
+> Tunggu sampai status MySQL menjadi `(healthy)` sebelum menjalankan migrasi.
+> Biasanya butuh 15–30 detik pertama kali.
+
+### Langkah 4 — Jalankan Migrasi Pertama
+
+```bash
+docker compose run --rm liquibase
+```
+
+Output sukses akan terlihat seperti:
+
+```
+Running Changeset: changelog/changes/v1.0/001-create-users-table.sql::001-create-users-table::developer
+Running Changeset: changelog/changes/v1.0/002-create-orders-table.sql::002-create-orders-table::developer
+Running Changeset: changelog/changes/v1.1/001-add-email-column.sql::003-add-email-column::developer
+
+UPDATE SUMMARY
+Run:                          3
+Previously run:               0
+Total change sets:            3
+
+Liquibase command 'update' was executed successfully.
+```
+
+### Langkah 5 — Verifikasi via Adminer
+
+Buka browser: **http://localhost:8080**
+
+| Field | Value |
+|---|---|
+| System | MySQL |
+| Server | `mysql` |
+| Username | `liquibase_user` |
+| Password | `liquibase_pass` |
+| Database | `liquibase_dev` |
+
+Tabel yang seharusnya ada:
+- `users` — tabel aplikasi
+- `orders` — tabel aplikasi
+- `DATABASECHANGELOG` — tracking changeset Liquibase
+- `DATABASECHANGELOGLOCK` — lock saat migrasi berjalan
+
+---
+
+## 3. Membuat Changeset Baru
+
+### Aturan Penamaan File
+
+```
+liquibase/changelog/changes/<versi>/<nomor>-<deskripsi>.sql
+```
+
+Contoh:
+```
+changes/v1.2/001-add-phone-column.sql
+changes/v1.2/002-create-products-table.sql
+changes/v2.0/001-add-index-users-email.sql
+```
+
+> [!IMPORTANT]
+> File dieksekusi **secara alfabetikal** dalam setiap folder versi.
+> Selalu gunakan prefix angka (`001-`, `002-`) agar urutan terjaga.
+
+### Format Wajib SQL Changeset
+
+```sql
+--liquibase formatted sql
+
+--changeset <author>:<unique-id> labels:<versi> context:all
+<SQL STATEMENT>;
+--rollback <SQL UNTUK UNDO>;
+```
+
+### Contoh: Tambah Kolom
+
+```sql
+--liquibase formatted sql
+
+--changeset developer:004-add-phone-column labels:v1.2 context:all
+ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL AFTER email;
+--rollback ALTER TABLE users DROP COLUMN phone;
+```
+
+### Contoh: Buat Tabel Baru
+
+```sql
+--liquibase formatted sql
+
+--changeset developer:005-create-products-table labels:v1.2 context:all
+CREATE TABLE products (
+    id         BIGINT          NOT NULL AUTO_INCREMENT,
+    name       VARCHAR(200)    NOT NULL,
+    price      DECIMAL(12, 2)  NOT NULL DEFAULT 0.00,
+    stock      INT             NOT NULL DEFAULT 0,
+    created_at TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_products PRIMARY KEY (id)
+);
+--rollback DROP TABLE IF EXISTS products;
+```
+
+### Contoh: Buat Index
+
+```sql
+--liquibase formatted sql
+
+--changeset developer:006-add-index-users-email labels:v1.2 context:all
+CREATE INDEX idx_users_email ON users (email);
+--rollback DROP INDEX idx_users_email ON users;
+```
+
+### Contoh: Multiple Statement dalam Satu Changeset
+
+```sql
+--liquibase formatted sql
+
+--changeset developer:007-seed-default-data labels:v1.2 context:all runOnChange:false
+INSERT INTO products (name, price, stock) VALUES ('Product A', 10000.00, 100);
+INSERT INTO products (name, price, stock) VALUES ('Product B', 25000.00, 50);
+--rollback DELETE FROM products WHERE name IN ('Product A', 'Product B');
+```
+
+> [!WARNING]
+> **Jangan pernah edit changeset yang sudah di-apply!**
+> Liquibase menyimpan checksum MD5 setiap changeset.
+> Jika checksum berubah, Liquibase akan error dan menolak menjalankan migrasi.
+
+---
+
+## 4. Menjalankan Migrasi Lokal
+
+Gunakan helper script `scripts/lb.sh` atau langsung via `docker compose`:
+
+### Lihat Changeset yang Belum Dijalankan
+
+```bash
+./scripts/lb.sh status
+```
+
+### Preview SQL (Tanpa Apply)
+
+```bash
+./scripts/lb.sh updateSQL
+```
+
+Output berupa SQL yang akan dieksekusi — gunakan ini untuk review sebelum apply.
+
+### Apply Migrasi
+
+```bash
+./scripts/lb.sh update
+# atau
+docker compose run --rm liquibase
+```
+
+### Validasi Format Changelog
+
+```bash
+./scripts/lb.sh validate
+```
+
+Gunakan sebelum push ke GitHub untuk memastikan format changeset benar.
+
+### Lihat History Changeset yang Sudah Dijalankan
+
+```bash
+./scripts/lb.sh history
+```
+
+---
+
+## 5. Rollback Changeset
+
+> [!CAUTION]
+> Rollback akan **mengubah data database**. Selalu backup terlebih dahulu di environment production.
+
+### Rollback N Changeset Terakhir
+
+```bash
+# Rollback 1 changeset terakhir
+./scripts/lb.sh rollback --rollbackCount=1
+
+# Rollback 3 changeset terakhir
+./scripts/lb.sh rollback --rollbackCount=3
+```
+
+### Rollback ke Tag Tertentu
+
+Tambahkan tag di changeset:
+
+```sql
+--changeset developer:tag-v1.1 labels:v1.1 context:all
+--comment: tag sebelum rilis v1.1
+--rollback empty
+```
+
+Lalu rollback ke tag tersebut:
+
+```bash
+./scripts/lb.sh rollback --rollbackToTag=v1.1
+```
+
+### Rollback ke Tanggal Tertentu
+
+```bash
+./scripts/lb.sh rollback --rollbackToDate=2024-01-01
+```
+
+---
+
+## 6. Setup GitHub Secrets
+
+### Cara Tambah Secret
+
+1. Buka repository di GitHub
+2. Klik **Settings** → **Secrets and variables** → **Actions**
+3. Klik **New repository secret**
+4. Isi nama dan value, klik **Add secret**
+
+### Daftar Secret yang Dibutuhkan
+
+| Secret Name | Keterangan | Contoh Value |
+|---|---|---|
+| `DB_USERNAME` | Username DB staging | `liquibase_user` |
+| `DB_PASSWORD` | Password DB staging | `StrongPass123!` |
+| `DB_URL_STAGING` | JDBC URL staging | `jdbc:mysql://db-staging.example.com:3306/app_staging?useSSL=true&serverTimezone=UTC` |
+| `DB_USERNAME_PROD` | Username DB production | `liquibase_prod` |
+| `DB_PASSWORD_PROD` | Password DB production | `VeryStrongPass456!` |
+| `DB_URL_PROD` | JDBC URL production | `jdbc:mysql://db-prod.example.com:3306/app_prod?useSSL=true&serverTimezone=UTC` |
+
+### Format JDBC URL
+
+```
+jdbc:mysql://<HOST>:<PORT>/<DATABASE>?useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC
+```
+
+Untuk PostgreSQL:
+```
+jdbc:postgresql://<HOST>:<PORT>/<DATABASE>?sslmode=require
+```
+
+---
+
+## 7. Setup Environment Protection (Manual Approval)
+
+Agar deploy ke production butuh approval manual:
+
+1. Buka repository di GitHub
+2. Klik **Settings** → **Environments**
+3. Klik **New environment**, beri nama `production`
+4. Di halaman environment, aktifkan **"Required reviewers"**
+5. Tambahkan username atau tim yang bisa approve
+6. Klik **Save protection rules**
+
+> [!NOTE]
+> Workflow akan **berhenti dan menunggu** di job `deploy-production` sampai reviewer menyetujui.
+> Reviewer akan mendapat notifikasi email dari GitHub.
+
+---
+
+## 8. Deploy via GitHub Actions
+
+### Deploy ke Staging
+
+```bash
+# Buat atau checkout branch staging
+git checkout -b staging
+# atau
+git checkout staging
+
+# Buat changeset baru (lihat bagian 3)
+# ...
+
+# Commit dan push
+git add liquibase/changelog/changes/v1.2/001-add-phone-column.sql
+git commit -m "feat: add phone column to users table"
+git push origin staging
+```
+
+Pipeline akan otomatis berjalan:
+1. ✅ **Validate** — cek format changelog (pakai MySQL ephemeral di runner)
+2. 📋 **updateSQL** — tampilkan dry-run SQL di log Actions
+3. 🚀 **Deploy Staging** — apply migrasi ke DB staging
+
+### Deploy ke Production
+
+```bash
+# Merge staging ke main via Pull Request di GitHub
+# Setelah PR diapprove dan di-merge:
+
+git checkout main
+git pull origin main
+```
+
+Pipeline akan berjalan:
+1. ✅ **Validate**
+2. ⏳ **Tunggu approval** dari reviewer
+3. 🏭 **Deploy Production** — apply migrasi ke DB production
+
+### Monitor Pipeline
+
+- Buka tab **Actions** di repository GitHub
+- Klik workflow run yang sedang berjalan
+- Expand setiap job untuk melihat log detail
+
+---
+
+## 9. Troubleshooting
+
+### ❌ Error: `Cannot find database driver`
+
+**Penyebab:** Image Liquibase standar tidak include MySQL JDBC driver.
+
+**Solusi:** Rebuild custom image:
+```bash
+DOCKER_BUILDKIT=0 docker compose build --no-cache liquibase
+```
+
+---
+
+### ❌ Error: `Unexpected formatting in formatted changelog`
+
+**Penyebab:** Ada komentar `--` setelah `--liquibase formatted sql` sebelum `--changeset`.
+
+**Salah:**
+```sql
+--liquibase formatted sql
+
+-- Ini komentar yang TIDAK boleh ada di sini
+--changeset developer:001 ...
+```
+
+**Benar:**
+```sql
+--liquibase formatted sql
+
+--changeset developer:001 labels:v1.0 context:all
+```
+
+---
+
+### ❌ Error: `Checksum mismatch`
+
+**Penyebab:** Changeset yang sudah di-apply diedit/diubah.
+
+**Solusi:**
+```bash
+# Jangan edit changeset lama — buat changeset baru untuk perubahan
+# Jika terpaksa di lokal (DEV ONLY):
+./scripts/lb.sh clearCheckSums
+./scripts/lb.sh update
+```
+
+> [!CAUTION]
+> `clearCheckSums` hanya boleh dijalankan di environment development. **Jangan di production.**
+
+---
+
+### ❌ MySQL container tidak `healthy`
+
+```bash
+# Cek log MySQL
+docker logs liquibase-mysql
+
+# Cek status health
+docker inspect liquibase-mysql --format '{{.State.Health.Status}}'
+
+# Force restart
+docker compose restart mysql
+```
+
+---
+
+### ❌ Error di GitHub Actions: `Connection refused`
+
+**Penyebab:** Secret `DB_URL_*` salah atau database tidak bisa diakses dari GitHub runner.
+
+**Cek:**
+- Pastikan firewall/security group mengizinkan koneksi dari GitHub Actions IP ranges
+- Pastikan format JDBC URL benar
+- Coba `ping` / `telnet` ke host:port dari dalam runner
+
+---
+
+## 10. Referensi Perintah
+
+### Helper Script `./scripts/lb.sh`
+
+```bash
+./scripts/lb.sh update                      # Apply semua pending changeset
+./scripts/lb.sh updateSQL                   # Preview SQL tanpa apply
+./scripts/lb.sh status                      # Lihat changeset yang belum dijalankan
+./scripts/lb.sh validate                    # Validasi format changelog
+./scripts/lb.sh history                     # Lihat riwayat changeset
+./scripts/lb.sh rollback --rollbackCount=1  # Rollback 1 changeset terakhir
+./scripts/lb.sh clearCheckSums             # Reset checksum (DEV ONLY!)
+./scripts/lb.sh diff                        # Bandingkan skema DB dengan changelog
+```
+
+### Docker Compose
+
+```bash
+docker compose up -d mysql adminer          # Start MySQL + Adminer
+docker compose run --rm liquibase           # Jalankan migrasi
+docker compose build liquibase              # Rebuild custom Liquibase image
+docker compose ps                           # Status container
+docker compose logs -f mysql                # Tail log MySQL
+docker compose down                         # Stop (data tetap)
+docker compose down -v                      # Stop + hapus semua data (reset DB)
+```
+
+### MySQL CLI di Container
+
+```bash
+# Masuk ke MySQL shell
+docker exec -it liquibase-mysql mysql -u liquibase_user -pliquibase_pass liquibase_dev
+
+# Query singkat
+docker exec liquibase-mysql mysql -u liquibase_user -pliquibase_pass liquibase_dev \
+  -e "SELECT * FROM DATABASECHANGELOG ORDER BY DATEEXECUTED;"
+```
+
+---
+
+> 📚 Dokumentasi resmi: [docs.liquibase.com](https://docs.liquibase.com)

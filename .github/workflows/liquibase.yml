@@ -1,0 +1,135 @@
+name: Liquibase CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'liquibase/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'liquibase/**'
+
+env:
+  LIQUIBASE_IMAGE: liquibase/liquibase:4.27
+  MYSQL_IMAGE: mysql:8.0
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1 — Validate changelog (semua push & PR)
+  # Spin up MySQL ephemeral, jalankan liquibase validate
+  # ─────────────────────────────────────────────────────────────
+  validate:
+    name: 🔍 Validate Changelog
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: liquibase_ci
+          MYSQL_USER: liquibase_user
+          MYSQL_PASSWORD: liquibase_pass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -prootpassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Liquibase — validate
+        uses: liquibase/liquibase-github-action@v7
+        with:
+          operation: validate
+          classpath: liquibase/changelog
+          changeLogFile: db.changelog-master.xml
+          username: liquibase_user
+          password: liquibase_pass
+          url: jdbc:mysql://localhost:3306/liquibase_ci?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+
+      - name: Liquibase — updateSQL (dry-run preview)
+        uses: liquibase/liquibase-github-action@v7
+        with:
+          operation: updateSQL
+          classpath: liquibase/changelog
+          changeLogFile: db.changelog-master.xml
+          username: liquibase_user
+          password: liquibase_pass
+          url: jdbc:mysql://localhost:3306/liquibase_ci?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2 — Deploy ke Staging (push ke branch staging)
+  # ─────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: 🚀 Deploy → Staging
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Liquibase — status (pending changesets)
+        uses: liquibase/liquibase-github-action@v7
+        with:
+          operation: status
+          classpath: liquibase/changelog
+          changeLogFile: db.changelog-master.xml
+          username: ${{ secrets.DB_USERNAME }}
+          password: ${{ secrets.DB_PASSWORD }}
+          url: ${{ secrets.DB_URL_STAGING }}
+
+      - name: Liquibase — update (apply migration)
+        uses: liquibase/liquibase-github-action@v7
+        with:
+          operation: update
+          classpath: liquibase/changelog
+          changeLogFile: db.changelog-master.xml
+          username: ${{ secrets.DB_USERNAME }}
+          password: ${{ secrets.DB_PASSWORD }}
+          url: ${{ secrets.DB_URL_STAGING }}
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3 — Deploy ke Production (push ke main, butuh approval)
+  # ─────────────────────────────────────────────────────────────
+  deploy-production:
+    name: 🏭 Deploy → Production
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production   # ← wajib approve manual di GitHub UI
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Liquibase — status production
+        uses: liquibase/liquibase-github-action@v7
+        with:
+          operation: status
+          classpath: liquibase/changelog
+          changeLogFile: db.changelog-master.xml
+          username: ${{ secrets.DB_USERNAME_PROD }}
+          password: ${{ secrets.DB_PASSWORD_PROD }}
+          url: ${{ secrets.DB_URL_PROD }}
+
+      - name: Liquibase — update production
+        uses: liquibase/liquibase-github-action@v7
+        with:
+          operation: update
+          classpath: liquibase/changelog
+          changeLogFile: db.changelog-master.xml
+          username: ${{ secrets.DB_USERNAME_PROD }}
+          password: ${{ secrets.DB_PASSWORD_PROD }}
+          url: ${{ secrets.DB_URL_PROD }}

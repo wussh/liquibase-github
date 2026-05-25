@@ -1,0 +1,14 @@
+# ── Ignore local credential overrides ──
+liquibase/liquibase.local.properties
+
+# ── Docker volumes ──
+mysql_data/
+
+# ── OS junk ──
+.DS_Store
+Thumbs.db
+
+# ── IDE ──
+.idea/
+.vscode/
+*.iml

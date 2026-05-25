@@ -1,0 +1,66 @@
+
+services:
+  # ── MySQL Database ──
+  mysql:
+    image: mysql:8.0
+    container_name: liquibase-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: liquibase_dev
+      MYSQL_USER: liquibase_user
+      MYSQL_PASSWORD: liquibase_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d   # optional init scripts
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - liquibase-net
+
+  # ── Liquibase (one-shot migration runner, custom image with MySQL driver) ──
+  liquibase:
+    build:
+      context: ./docker/liquibase
+      dockerfile: Dockerfile
+    image: liquibase-mysql:4.27
+    container_name: liquibase-runner
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./liquibase/changelog:/liquibase/changelog
+    command:
+      - --url=jdbc:mysql://mysql:3306/liquibase_dev?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - --username=liquibase_user
+      - --password=liquibase_pass
+      - --changelogFile=changelog/db.changelog-master.xml
+      - --driver=com.mysql.cj.jdbc.Driver
+      - update
+    networks:
+      - liquibase-net
+
+  # ── Adminer (DB GUI) ──
+  adminer:
+    image: adminer:latest
+    container_name: liquibase-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+    networks:
+      - liquibase-net
+
+volumes:
+  mysql_data:
+
+networks:
+  liquibase-net:
+    driver: bridge
