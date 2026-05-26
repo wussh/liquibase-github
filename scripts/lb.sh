@@ -182,15 +182,17 @@ if [ "$OPERATION" = "generate-master" ]; then
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
     <!--
-        ⚠️  File ini di-generate OTOMATIS oleh:
-              ./scripts/lb.sh --db-name=$DB_NAME --ver=$DB_VER generate-master
+        File ini di-generate OTOMATIS.
+        db-name : $DB_NAME
+        ver     : $DB_VER
+        perintah: scripts/lb.sh [db-name] [ver] generate-master
 
-           JANGAN diedit manual — perubahan akan tertimpa.
+        JANGAN diedit manual - perubahan akan tertimpa.
 
-           Cara menambah changeset baru:
-             1. Buat file SQL di : $CHANGES_REL/000X-nama.sql
-             2. Buat rollback di : $ROLLBACK_REL/000X-rollback.sql
-             3. Jalankan        : ./scripts/lb.sh --db-name=$DB_NAME --ver=$DB_VER generate-master
+        Cara menambah changeset baru:
+          1. Buat file SQL di : $CHANGES_REL/000X-nama.sql
+          2. Buat rollback di : $ROLLBACK_REL/000X-rollback.sql
+          3. Jalankan generate-master lagi
     -->
 EOF
 

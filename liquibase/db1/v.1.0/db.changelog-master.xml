@@ -6,15 +6,17 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
     <!--
-        ⚠️  File ini di-generate OTOMATIS oleh:
-              ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+        File ini di-generate OTOMATIS.
+        db-name : db1
+        ver     : v.1.0
+        perintah: scripts/lb.sh [db-name] [ver] generate-master
 
-           JANGAN diedit manual — perubahan akan tertimpa.
+        JANGAN diedit manual - perubahan akan tertimpa.
 
-           Cara menambah changeset baru:
-             1. Buat file SQL di : changes/000X-nama.sql
-             2. Buat rollback di : rollback/000X-rollback.sql
-             3. Jalankan        : ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+        Cara menambah changeset baru:
+          1. Buat file SQL di : changes/000X-nama.sql
+          2. Buat rollback di : rollback/000X-rollback.sql
+          3. Jalankan generate-master lagi
     -->
 
     <!-- ═══ v.1.0-0001-create-table-users ═══ -->
