@@ -1,1 +1,0 @@
--- Rollback 0005: DROP tabel yang dibuat oleh 0005-*.sql

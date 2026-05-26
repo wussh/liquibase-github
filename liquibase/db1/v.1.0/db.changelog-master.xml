@@ -7,19 +7,19 @@
 
     <!--
         ⚠️  File ini di-generate OTOMATIS oleh:
-              ./scripts/lb.sh --db-name=... --ver=... generate-master
+              ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
 
            JANGAN diedit manual — perubahan akan tertimpa.
 
            Cara menambah changeset baru:
-             1. Buat file SQL di : changelog/changes/000X-nama.sql
+             1. Buat file SQL di : changes/000X-nama.sql
              2. Buat rollback di : rollback/000X-rollback.sql
-             3. Jalankan        : ./scripts/lb.sh --db-name=... --ver=... generate-master
+             3. Jalankan        : ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
     -->
 
-    <!-- ═══ 0001-create-table-users ═══ -->
-    <changeSet id="0001-create-table-users" author="wussh">
-        <sqlFile path="changelog/changes/0001-create-table-users.sql"
+    <!-- ═══ v.1.0-0001-create-table-users ═══ -->
+    <changeSet id="v.1.0-0001-create-table-users" author="wussh">
+        <sqlFile path="changes/0001-create-table-users.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -31,9 +31,9 @@
         </rollback>
     </changeSet>
 
-    <!-- ═══ 0002-add-column-users-verified ═══ -->
-    <changeSet id="0002-add-column-users-verified" author="wussh">
-        <sqlFile path="changelog/changes/0002-add-column-users-verified.sql"
+    <!-- ═══ v.1.0-0002-add-column-users-verified ═══ -->
+    <changeSet id="v.1.0-0002-add-column-users-verified" author="wussh">
+        <sqlFile path="changes/0002-add-column-users-verified.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -45,9 +45,9 @@
         </rollback>
     </changeSet>
 
-    <!-- ═══ 0003-modify-column-users-email ═══ -->
-    <changeSet id="0003-modify-column-users-email" author="wussh">
-        <sqlFile path="changelog/changes/0003-modify-column-users-email.sql"
+    <!-- ═══ v.1.0-0003-modify-column-users-email ═══ -->
+    <changeSet id="v.1.0-0003-modify-column-users-email" author="wussh">
+        <sqlFile path="changes/0003-modify-column-users-email.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -59,9 +59,9 @@
         </rollback>
     </changeSet>
 
-    <!-- ═══ 0004-add-index-users-phone ═══ -->
-    <changeSet id="0004-add-index-users-phone" author="wussh">
-        <sqlFile path="changelog/changes/0004-add-index-users-phone.sql"
+    <!-- ═══ v.1.0-0004-add-index-users-phone ═══ -->
+    <changeSet id="v.1.0-0004-add-index-users-phone" author="wussh">
+        <sqlFile path="changes/0004-add-index-users-phone.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -73,9 +73,9 @@
         </rollback>
     </changeSet>
 
-    <!-- ═══ 0005-seed-data-roles ═══ -->
-    <changeSet id="0005-seed-data-roles" author="wussh">
-        <sqlFile path="changelog/changes/0005-seed-data-roles.sql"
+    <!-- ═══ v.1.0-0005-seed-data-roles ═══ -->
+    <changeSet id="v.1.0-0005-seed-data-roles" author="wussh">
+        <sqlFile path="changes/0005-seed-data-roles.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -87,9 +87,9 @@
         </rollback>
     </changeSet>
 
-    <!-- ═══ 0006-add-fk-users-roles ═══ -->
-    <changeSet id="0006-add-fk-users-roles" author="wussh">
-        <sqlFile path="changelog/changes/0006-add-fk-users-roles.sql"
+    <!-- ═══ v.1.0-0006-add-fk-users-roles ═══ -->
+    <changeSet id="v.1.0-0006-add-fk-users-roles" author="wussh">
+        <sqlFile path="changes/0006-add-fk-users-roles.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>

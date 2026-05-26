@@ -6,36 +6,20 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
     <!--
-        Master Changelog — MBTL_INT_COBA v1.0
-        ───────────────────────────────────────
-        Setiap <changeSet> menghubungkan file SQL dari 2 folder:
-          - changelog/changes/  → SQL untuk CREATE/ALTER (forward migration)
-          - rollback/           → SQL untuk DROP/REVERT (rollback)
+        ⚠️  File ini di-generate OTOMATIS oleh:
+              ./scripts/lb.sh --db-name=db1 --ver=v.1.1 generate-master
 
-        Cara menjalankan:
-          ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 update
-          ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 rollback-count --count=1
+           JANGAN diedit manual — perubahan akan tertimpa.
+
+           Cara menambah changeset baru:
+             1. Buat file SQL di : changes/000X-nama.sql
+             2. Buat rollback di : rollback/000X-rollback.sql
+             3. Jalankan        : ./scripts/lb.sh --db-name=db1 --ver=v.1.1 generate-master
     -->
 
-    <!-- ═══════════════════════════════════════════════════════
-         Template changeset baru (copy-paste untuk setiap file baru)
-         ═══════════════════════════════════════════════════════
-    <changeSet id="000X-nama-changeset" author="nama_kamu" labels="v1.0">
-        <sqlFile path="changelog/changes/000X-nama-changeset.sql"
-                 relativeToChangelogFile="true"
-                 splitStatements="true"
-                 endDelimiter=";"/>
-        <rollback>
-            <sqlFile path="rollback/000X-nama-changeset-rollback.sql"
-                     relativeToChangelogFile="true"
-                     splitStatements="true"
-                     endDelimiter=";"/>
-        </rollback>
-    </changeSet>
-    -->
-
-    <changeSet id="0001-init-table" author="nama_kamu" labels="v1.0">
-        <sqlFile path="changelog/changes/0001-init-table.sql"
+    <!-- ═══ v.1.1-0001-create-table-users ═══ -->
+    <changeSet id="v.1.1-0001-create-table-users" author="wussh">
+        <sqlFile path="changes/0001-create-table-users.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -47,8 +31,9 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="0002-init-master-bank-list-mobile-international" author="nama_kamu" labels="v1.0">
-        <sqlFile path="changelog/changes/0002-init-master-bank-list-mobile-international.sql"
+    <!-- ═══ v.1.1-0002-add-column-users-verified ═══ -->
+    <changeSet id="v.1.1-0002-add-column-users-verified" author="wussh">
+        <sqlFile path="changes/0002-add-column-users-verified.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -60,8 +45,9 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="0003-init-master-mapping-bank-international" author="nama_kamu" labels="v1.0">
-        <sqlFile path="changelog/changes/0003-init-master-mapping-bank-international.sql"
+    <!-- ═══ v.1.1-0003-modify-column-users-email ═══ -->
+    <changeSet id="v.1.1-0003-modify-column-users-email" author="wussh">
+        <sqlFile path="changes/0003-modify-column-users-email.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -73,8 +59,9 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="0004-init-master-switch-int" author="nama_kamu" labels="v1.0">
-        <sqlFile path="changelog/changes/0004-init-master-switch-int.sql"
+    <!-- ═══ v.1.1-0004-add-index-users-phone ═══ -->
+    <changeSet id="v.1.1-0004-add-index-users-phone" author="wussh">
+        <sqlFile path="changes/0004-add-index-users-phone.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -86,8 +73,9 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="0005-init-master-transfer-purpose" author="nama_kamu" labels="v1.0">
-        <sqlFile path="changelog/changes/0005-init-master-transfer-purpose.sql"
+    <!-- ═══ v.1.1-0005-seed-data-roles ═══ -->
+    <changeSet id="v.1.1-0005-seed-data-roles" author="wussh">
+        <sqlFile path="changes/0005-seed-data-roles.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
@@ -99,8 +87,9 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="0006-init-coba-juga-ae" author="nama_kamu" labels="v1.0">
-        <sqlFile path="changelog/changes/0006-init-coba-juga-ae.sql"
+    <!-- ═══ v.1.1-0006-add-fk-users-roles ═══ -->
+    <changeSet id="v.1.1-0006-add-fk-users-roles" author="wussh">
+        <sqlFile path="changes/0006-add-fk-users-roles.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
                  endDelimiter=";"/>
