@@ -317,6 +317,38 @@ Perintah `generate-master` memindai folder `changes/` and `rollback/`, lalu memb
    ./scripts/lb.sh --external --db-name=db1 --ver=v.1.1 rollback --tag=before-v1.1
    ```
 
+### Aturan Rollback: Harus Berurutan (LIFO), Tidak Bisa Lompat
+
+> [!WARNING]
+> Dalam Liquibase, **rollback TIDAK BISA dilakukan secara melompat (acak/selektif)**. Rollback **harus dilakukan secara berurutan mundur** dari changeset paling baru ke changeset yang lebih lama (prinsip LIFO - *Last In, First Out*).
+
+#### Mengapa Tidak Bisa Melompat?
+Misalnya kamu memiliki urutan changeset berikut yang sudah diaplikasikan (dari lama ke baru):
+1. `0001-create-table-users`
+2. `0002-add-column-email`
+3. `0003-create-table-orders` (yang memiliki Foreign Key ke tabel `users`)
+
+Jika kamu mencoba melakukan rollback **hanya** untuk changeset `0001` (menghapus tabel `users`) secara melompat tanpa melakukan rollback untuk `0002` dan `0003`, database akan error karena ada constraint/dependensi (tabel `orders` masih merujuk ke tabel `users` yang ingin kamu hapus). Oleh karena itu, Liquibase menjaga integritas database dengan memaksa rollback berjalan mundur secara berurutan.
+
+#### Opsi Jika Ingin Membatalkan Perubahan di Tengah-Tengah (Forward-Migration / Roll-Forward)
+Jika changeset yang ingin kamu batalkan berada di tengah-tengah (misalnya, kamu ingin membatalkan efek dari changeset `0002` tapi tidak ingin menyentuh changeset `0003` dan `0004` yang sudah sukses di production), **jangan gunakan perintah rollback**. 
+
+Caranya adalah membuat **changeset baru** yang isinya membatalkan perubahan changeset lama tersebut:
+
+1. **Buat file changes baru** (misal `0005-drop-column-email.sql`):
+   ```sql
+   ALTER TABLE `users` DROP COLUMN `email`;
+   ```
+2. **Buat file rollback pasangannya** (`0005-rollback.sql`):
+   ```sql
+   ALTER TABLE `users` ADD COLUMN `email` VARCHAR(255);
+   ```
+3. **Generate master XML dan jalankan update**:
+   ```bash
+   ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
+   ```
+
 ---
 
 ## 9. Onboarding Database yang Sudah Ada
