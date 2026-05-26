@@ -407,12 +407,70 @@ DB Existing (sudah ada tabel)
 
 ---
 
+### Koneksi ke DB Existing dengan Flag `--external`
+
+Script `lb.sh` mendukung mode **external** untuk connect ke database yang berada di luar Docker internal (misalnya server lain, VM, atau cloud RDS).
+
+#### Cara 1 — Via Environment Variable
+
+Set env var sebelum menjalankan perintah:
+
+```bash
+EXT_DB_HOST=192.168.1.100 \
+EXT_DB_PORT=3306 \
+EXT_DB_NAME=myapp_db \
+EXT_DB_USER=admin \
+EXT_DB_PASS=secret \
+./scripts/lb.sh --external status
+```
+
+| Env Var | Keterangan | Default |
+|---|---|---|
+| `EXT_DB_HOST` | Host/IP database | `127.0.0.1` |
+| `EXT_DB_PORT` | Port database | `3306` |
+| `EXT_DB_NAME` | Nama database | `liquibase_dev` |
+| `EXT_DB_USER` | Username | `liquibase_user` |
+| `EXT_DB_PASS` | Password | `liquibase_pass` |
+
+#### Cara 2 — Via Flag Inline
+
+```bash
+./scripts/lb.sh --external --host=192.168.1.100 --db=myapp_db update
+```
+
+> [!NOTE]
+> Flag `--host` dan `--db` bisa dikombinasikan dengan env var.
+> Flag inline akan **override** env var jika keduanya diset.
+
+#### Cara 3 — DB di Host Machine (localhost)
+
+Jika database jalan langsung di mesin kamu (bukan di Docker), gunakan `127.0.0.1` sebagai host:
+
+```bash
+EXT_DB_HOST=127.0.0.1 \
+EXT_DB_NAME=myapp_local \
+EXT_DB_USER=root \
+EXT_DB_PASS=rootpass \
+./scripts/lb.sh --external status
+```
+
+> [!NOTE]
+> Mode `--external` otomatis menggunakan `--network=host` di Docker,
+> sehingga container Liquibase bisa menjangkau database di host machine atau jaringan LAN.
+
+---
+
 ### Langkah 1 — Generate Baseline Changelog dari DB Existing
 
 Liquibase akan connect ke database existing, membaca semua tabel, kolom, index, dan foreign key, lalu menuangkannya ke file changelog:
 
 ```bash
-./scripts/lb.sh generateChangelog --changelogFile=changelog/changes/v1.0/000-baseline.sql
+# Ke Docker internal
+./scripts/lb.sh generateChangeLog --changelogFile=changelog/changes/v1.0/000-baseline.sql
+
+# Ke DB external
+EXT_DB_HOST=192.168.1.100 EXT_DB_NAME=myapp_db EXT_DB_USER=admin EXT_DB_PASS=secret \
+./scripts/lb.sh --external generateChangeLog --changelogFile=changelog/changes/v1.0/000-baseline.sql
 ```
 
 File `000-baseline.sql` yang dihasilkan akan berisi DDL semua objek yang sudah ada, misalnya:
@@ -450,7 +508,12 @@ CREATE TABLE orders (
 Karena tabel-tabel tersebut **sudah ada** di database, kita perlu memberi tahu Liquibase bahwa changeset baseline sudah "pernah dijalankan" — tanpa benar-benar mengeksekusi DDL-nya:
 
 ```bash
+# Ke Docker internal
 ./scripts/lb.sh changelogSync
+
+# Ke DB external
+EXT_DB_HOST=192.168.1.100 EXT_DB_NAME=myapp_db EXT_DB_USER=admin EXT_DB_PASS=secret \
+./scripts/lb.sh --external changelogSync
 ```
 
 Perintah ini akan:
@@ -461,7 +524,9 @@ Perintah ini akan:
 Verifikasi hasilnya:
 
 ```bash
-./scripts/lb.sh history
+# Cek history di DB external
+EXT_DB_HOST=192.168.1.100 EXT_DB_NAME=myapp_db EXT_DB_USER=admin EXT_DB_PASS=secret \
+./scripts/lb.sh --external history
 # OUTPUT:
 # ID: 1  Author: liquibase-generated  File: 000-baseline.sql  Status: EXECUTED
 # ID: 2  Author: liquibase-generated  File: 000-baseline.sql  Status: EXECUTED
@@ -474,7 +539,7 @@ Verifikasi hasilnya:
 Pastikan tidak ada changeset yang pending (semua sudah ter-sync):
 
 ```bash
-./scripts/lb.sh status
+./scripts/lb.sh --external status
 # OUTPUT:
 # liquibase-github is up to date
 # 0 change sets have not been applied
@@ -499,8 +564,9 @@ ALTER TABLE users ADD COLUMN email VARCHAR(255) NULL AFTER name;
 --rollback ALTER TABLE users DROP COLUMN email;
 EOF
 
-# Apply hanya changeset baru ini
-./scripts/lb.sh update
+# Apply ke DB external
+EXT_DB_HOST=192.168.1.100 EXT_DB_NAME=myapp_db EXT_DB_USER=admin EXT_DB_PASS=secret \
+./scripts/lb.sh --external update
 ```
 
 > [!WARNING]
@@ -514,10 +580,27 @@ EOF
 Jika ingin melihat SQL yang akan diinsert ke `DATABASECHANGELOG` sebelum benar-benar dijalankan:
 
 ```bash
+# Docker internal
 ./scripts/lb.sh changelogSyncSQL
+
+# DB external
+./scripts/lb.sh --external changelogSyncSQL
 ```
 
 Output berupa `INSERT INTO DATABASECHANGELOG ...` — cocok untuk review atau audit.
+
+---
+
+### Ringkasan Pilihan Command untuk Existing DB
+
+| Situasi | Command |
+|---|---|
+| DB sudah ada schema, mau mulai track | `--external changelogSync` |
+| Belum ada changelog, generate dari DB | `--external generateChangeLog` |
+| Preview SQL sync sebelum dijalankan | `--external changelogSyncSQL` |
+| Apply migration baru ke existing DB | `--external update` |
+| Cek status migration di existing DB | `--external status` |
+| Lihat riwayat migration di existing DB | `--external history` |
 
 ---
 
@@ -600,7 +683,7 @@ docker compose restart mysql
 
 ## 11. Referensi Perintah
 
-### Helper Script `./scripts/lb.sh`
+### Helper Script `./scripts/lb.sh` — Mode Default (Docker Internal)
 
 ```bash
 ./scripts/lb.sh update                      # Apply semua pending changeset
@@ -609,8 +692,34 @@ docker compose restart mysql
 ./scripts/lb.sh validate                    # Validasi format changelog
 ./scripts/lb.sh history                     # Lihat riwayat changeset
 ./scripts/lb.sh rollback --rollbackCount=1  # Rollback 1 changeset terakhir
+./scripts/lb.sh rollback --rollbackToTag=v1.1  # Rollback ke tag
 ./scripts/lb.sh clearCheckSums             # Reset checksum (DEV ONLY!)
 ./scripts/lb.sh diff                        # Bandingkan skema DB dengan changelog
+./scripts/lb.sh generateChangeLog           # Generate changelog dari DB
+./scripts/lb.sh changelogSync               # Sync changelog tanpa eksekusi SQL
+./scripts/lb.sh changelogSyncSQL            # Preview SQL sync
+```
+
+### Helper Script `./scripts/lb.sh` — Mode External DB
+
+```bash
+# Semua perintah di atas bisa dipakai dengan flag --external
+./scripts/lb.sh --external update
+./scripts/lb.sh --external status
+./scripts/lb.sh --external history
+./scripts/lb.sh --external generateChangeLog
+./scripts/lb.sh --external changelogSync
+
+# Override host & db langsung via flag
+./scripts/lb.sh --external --host=192.168.1.100 --db=myapp_db update
+
+# Override semua koneksi via env var
+EXT_DB_HOST=192.168.1.100 \
+EXT_DB_PORT=3306 \
+EXT_DB_NAME=myapp_db \
+EXT_DB_USER=admin \
+EXT_DB_PASS=secret \
+./scripts/lb.sh --external update
 ```
 
 ### Docker Compose
