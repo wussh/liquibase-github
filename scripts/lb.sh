@@ -292,11 +292,34 @@ fi
 
 # ── Mode External DB ─────────────────────────────────────────
 if [ "$EXTERNAL_MODE" = true ]; then
-  EXT_HOST="${OVERRIDE_HOST:-${EXT_DB_HOST:-"127.0.0.1"}}"
-  EXT_PORT="${EXT_DB_PORT:-3306}"
-  EXT_NAME="${OVERRIDE_DB:-${EXT_DB_NAME:-"liquibase_dev"}}"
-  EXT_USER="${EXT_DB_USER:-"liquibase_user"}"
-  EXT_PASS="${EXT_DB_PASS:-"liquibase_pass"}"
+  # Jika --db-name ditentukan, coba baca variabel spesifik per-database:
+  #   DB_{NAMA_DB}_HOST, DB_{NAMA_DB}_PORT, DB_{NAMA_DB}_NAME,
+  #   DB_{NAMA_DB}_USER, DB_{NAMA_DB}_PASS
+  # Jika tidak ada, fallback ke variabel global EXT_DB_*
+  if [ -n "$DB_NAME" ]; then
+    # Ubah karakter non-alphanumeric menjadi _ agar valid sebagai nama variabel
+    DB_KEY=$(echo "$DB_NAME" | tr '[:lower:]' '[:upper:]' | tr -cs 'A-Z0-9' '_')
+
+    # Baca nilai spesifik per-DB (pakai indirect variable expansion)
+    _SPEC_HOST=$(eval echo "\${DB_${DB_KEY}_HOST:-}")
+    _SPEC_PORT=$(eval echo "\${DB_${DB_KEY}_PORT:-}")
+    _SPEC_NAME=$(eval echo "\${DB_${DB_KEY}_NAME:-}")
+    _SPEC_USER=$(eval echo "\${DB_${DB_KEY}_USER:-}")
+    _SPEC_PASS=$(eval echo "\${DB_${DB_KEY}_PASS:-}")
+
+    # Gabungkan: spesifik per-DB > override flag > global EXT_DB_* > default
+    EXT_HOST="${OVERRIDE_HOST:-${_SPEC_HOST:-${EXT_DB_HOST:-"127.0.0.1"}}}"
+    EXT_PORT="${_SPEC_PORT:-${EXT_DB_PORT:-3306}}"
+    EXT_NAME="${OVERRIDE_DB:-${_SPEC_NAME:-${EXT_DB_NAME:-"$DB_NAME"}}}"
+    EXT_USER="${_SPEC_USER:-${EXT_DB_USER:-"liquibase_user"}}"
+    EXT_PASS="${_SPEC_PASS:-${EXT_DB_PASS:-"liquibase_pass"}}"
+  else
+    EXT_HOST="${OVERRIDE_HOST:-${EXT_DB_HOST:-"127.0.0.1"}}"
+    EXT_PORT="${EXT_DB_PORT:-3306}"
+    EXT_NAME="${OVERRIDE_DB:-${EXT_DB_NAME:-"liquibase_dev"}}"
+    EXT_USER="${EXT_DB_USER:-"liquibase_user"}"
+    EXT_PASS="${EXT_DB_PASS:-"liquibase_pass"}"
+  fi
 
   # Native mode: bisa pakai localhost langsung (tidak perlu host network trick)
   if [ "$USE_NATIVE" = true ]; then
