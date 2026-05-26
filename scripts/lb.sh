@@ -41,6 +41,16 @@ LIQUIBASE_IMAGE="liquibase-mysql:4.27"
 MYSQL_CONTAINER="liquibase-mysql"
 NETWORK="liquibase-github_liquibase-net"
 
+# ── Load .env jika ada (dari root project) ──────────────────
+ENV_FILE="$ROOT_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+  # Hanya export baris yang valid (key=value), skip komentar & baris kosong
+  set -o allexport
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  set +o allexport
+fi
+
 # ── Default koneksi (Docker internal) ───────────────────────
 DB_URL="jdbc:mysql://mysql:3306/liquibase_dev?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 DB_USER="liquibase_user"

@@ -1,4 +1,7 @@
 # ── Ignore local credential overrides ──
+.env
+.env.*
+!.env.example
 liquibase/liquibase.local.properties
 
 # ── Docker volumes ──

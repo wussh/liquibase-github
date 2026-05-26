@@ -411,9 +411,41 @@ DB Existing (sudah ada tabel)
 
 Script `lb.sh` mendukung mode **external** untuk connect ke database yang berada di luar Docker internal (misalnya server lain, VM, atau cloud RDS).
 
-#### Cara 1 — Via Environment Variable
+#### Cara 1 — Via File `.env` ⭐ (Direkomendasikan)
 
-Set env var sebelum menjalankan perintah:
+Buat file `.env` di root project dari template yang sudah tersedia:
+
+```bash
+cp .env.example .env
+```
+
+Edit file `.env` sesuai koneksi database kamu:
+
+```bash
+# .env
+EXT_DB_HOST=192.168.1.100
+EXT_DB_PORT=3306
+EXT_DB_NAME=myapp_db
+EXT_DB_USER=admin
+EXT_DB_PASS=secret
+```
+
+Setelah itu cukup jalankan perintah tanpa perlu set env var apapun:
+
+```bash
+./scripts/lb.sh --external status
+./scripts/lb.sh --external update
+```
+
+> [!CAUTION]
+> File `.env` sudah masuk `.gitignore` — **jangan pernah commit `.env` ke Git**
+> karena berisi kredensial database. Gunakan `.env.example` sebagai template yang aman untuk di-commit.
+
+---
+
+#### Cara 2 — Via Environment Variable (Inline)
+
+Set env var langsung sebelum perintah (berguna untuk CI/CD atau one-time):
 
 ```bash
 EXT_DB_HOST=192.168.1.100 \
@@ -432,25 +464,31 @@ EXT_DB_PASS=secret \
 | `EXT_DB_USER` | Username | `liquibase_user` |
 | `EXT_DB_PASS` | Password | `liquibase_pass` |
 
-#### Cara 2 — Via Flag Inline
+#### Cara 3 — Via Flag Inline
 
 ```bash
 ./scripts/lb.sh --external --host=192.168.1.100 --db=myapp_db update
 ```
 
 > [!NOTE]
-> Flag `--host` dan `--db` bisa dikombinasikan dengan env var.
-> Flag inline akan **override** env var jika keduanya diset.
+> Flag `--host` dan `--db` bisa dikombinasikan dengan env var atau `.env`.
+> Prioritas override: **Flag inline** > **Env var** > **Nilai dari `.env`** > **Default**.
 
-#### Cara 3 — DB di Host Machine (localhost)
+#### Cara 4 — DB di Host Machine (localhost)
 
-Jika database jalan langsung di mesin kamu (bukan di Docker), gunakan `127.0.0.1` sebagai host:
+Jika database jalan langsung di mesin kamu (bukan di Docker):
 
 ```bash
-EXT_DB_HOST=127.0.0.1 \
-EXT_DB_NAME=myapp_local \
-EXT_DB_USER=root \
-EXT_DB_PASS=rootpass \
+# Cukup set di .env:
+EXT_DB_HOST=127.0.0.1
+EXT_DB_NAME=myapp_local
+EXT_DB_USER=root
+EXT_DB_PASS=rootpass
+```
+
+Lalu:
+
+```bash
 ./scripts/lb.sh --external status
 ```
 
