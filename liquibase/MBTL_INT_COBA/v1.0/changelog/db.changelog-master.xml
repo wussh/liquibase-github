@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <!--
+        Master Changelog — MBTL_INT_COBA v1.0
+        ───────────────────────────────────────
+        Setiap <changeSet> menghubungkan file SQL dari 2 folder:
+          - changelog/changes/  → SQL untuk CREATE/ALTER (forward migration)
+          - rollback/           → SQL untuk DROP/REVERT (rollback)
+
+        Cara menjalankan:
+          ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 update
+          ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 rollback-count --count=1
+    -->
+
+    <!-- ═══════════════════════════════════════════════════════
+         Template changeset baru (copy-paste untuk setiap file baru)
+         ═══════════════════════════════════════════════════════
+    <changeSet id="000X-nama-changeset" author="nama_kamu" labels="v1.0">
+        <sqlFile path="changelog/changes/000X-nama-changeset.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/000X-nama-changeset-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+    -->
+
+    <changeSet id="0001-init-table" author="nama_kamu" labels="v1.0">
+        <sqlFile path="changelog/changes/0001-init-table.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0001-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="0002-init-master-bank-list-mobile-international" author="nama_kamu" labels="v1.0">
+        <sqlFile path="changelog/changes/0002-init-master-bank-list-mobile-international.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0002-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="0003-init-master-mapping-bank-international" author="nama_kamu" labels="v1.0">
+        <sqlFile path="changelog/changes/0003-init-master-mapping-bank-international.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0003-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="0004-init-master-switch-int" author="nama_kamu" labels="v1.0">
+        <sqlFile path="changelog/changes/0004-init-master-switch-int.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0004-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="0005-init-master-transfer-purpose" author="nama_kamu" labels="v1.0">
+        <sqlFile path="changelog/changes/0005-init-master-transfer-purpose.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0005-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="0006-init-coba-juga-ae" author="nama_kamu" labels="v1.0">
+        <sqlFile path="changelog/changes/0006-init-coba-juga-ae.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0006-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

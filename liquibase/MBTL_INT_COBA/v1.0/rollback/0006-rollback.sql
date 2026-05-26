@@ -1,0 +1,1 @@
+-- Rollback 0006: DROP tabel yang dibuat oleh 0006-*.sql

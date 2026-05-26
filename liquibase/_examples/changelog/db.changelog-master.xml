@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <!--
+        ⚠️  File ini di-generate OTOMATIS oleh:
+              ./scripts/lb.sh --db-name=... --ver=... generate-master
+
+           JANGAN diedit manual — perubahan akan tertimpa.
+
+           Cara menambah changeset baru:
+             1. Buat file SQL di : changelog/changes/000X-nama.sql
+             2. Buat rollback di : rollback/000X-rollback.sql
+             3. Jalankan        : ./scripts/lb.sh --db-name=... --ver=... generate-master
+    -->
+
+    <!-- ═══ 0001-create-table-users ═══ -->
+    <changeSet id="0001-create-table-users" author="wussh">
+        <sqlFile path="changelog/changes/0001-create-table-users.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0001-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ═══ 0002-add-column-users-verified ═══ -->
+    <changeSet id="0002-add-column-users-verified" author="wussh">
+        <sqlFile path="changelog/changes/0002-add-column-users-verified.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0002-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ═══ 0003-modify-column-users-email ═══ -->
+    <changeSet id="0003-modify-column-users-email" author="wussh">
+        <sqlFile path="changelog/changes/0003-modify-column-users-email.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0003-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ═══ 0004-add-index-users-phone ═══ -->
+    <changeSet id="0004-add-index-users-phone" author="wussh">
+        <sqlFile path="changelog/changes/0004-add-index-users-phone.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0004-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ═══ 0005-seed-data-roles ═══ -->
+    <changeSet id="0005-seed-data-roles" author="wussh">
+        <sqlFile path="changelog/changes/0005-seed-data-roles.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0005-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ═══ 0006-add-fk-users-roles ═══ -->
+    <changeSet id="0006-add-fk-users-roles" author="wussh">
+        <sqlFile path="changelog/changes/0006-add-fk-users-roles.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 endDelimiter=";"/>
+        <rollback>
+            <sqlFile path="rollback/0006-rollback.sql"
+                     relativeToChangelogFile="true"
+                     splitStatements="true"
+                     endDelimiter=";"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

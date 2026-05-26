@@ -9,34 +9,38 @@
 #   ./scripts/lb.sh updateSQL
 #   ./scripts/lb.sh history
 #   ./scripts/lb.sh rollback-count --count=1
-#   ./scripts/lb.sh rollback --rollbackToTag=v1.1
+#   ./scripts/lb.sh rollback --tag=v1.1
 #   ./scripts/lb.sh clearCheckSums
 #   ./scripts/lb.sh diff
 #   ./scripts/lb.sh generateChangeLog
 #   ./scripts/lb.sh changelogSync
 #   ./scripts/lb.sh dropAll
 #
-# MODE EXTERNAL DB (existing database):
-#   ./scripts/lb.sh --external update
-#   ./scripts/lb.sh --external status
-#   ./scripts/lb.sh --external validate
-#   ./scripts/lb.sh --external updateSQL
-#   ./scripts/lb.sh --external history
-#   ./scripts/lb.sh --external rollback-count --count=1
-#   ./scripts/lb.sh --external rollback --rollbackToTag=v1.1
-#   ./scripts/lb.sh --external clearCheckSums
-#   ./scripts/lb.sh --external diff
-#   ./scripts/lb.sh --external generateChangeLog
-#   ./scripts/lb.sh --external changelogSync
-#   ./scripts/lb.sh --external dropAll
+# GENERATE MASTER XML (tidak perlu koneksi DB):
+#   ./scripts/lb.sh --db-name=MBTL_INT_COBA --ver=v1.0 generate-master
+#   (Auto-scan changelog/changes/ + rollback/ → generate db.changelog-master.xml)
 #
-#   Override koneksi via .env atau env var:
-#     EXT_DB_HOST=192.168.1.100 \
-#     EXT_DB_NAME=myapp_db \
-#     ./scripts/lb.sh --external update
+# MODE EXTERNAL DB (existing database):
+#   Struktur folder: liquibase/{DB_NAME}/{VERSION}/changelog/db.changelog-master.xml
+#
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 update
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 status
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 validate
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 updateSQL
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 history
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 rollback-count --count=1
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 rollback --tag=v1.0
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 clearCheckSums
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 diff
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 generateChangeLog
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 changelogSync
+#   ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 dropAll
+#
+#   Override host/db connection via .env atau env var:
+#     EXT_DB_HOST=192.168.1.100 ./scripts/lb.sh --external --db-name=MBTL_INT_COBA --ver=v1.0 update
 #
 #   Atau via flag langsung:
-#     ./scripts/lb.sh --external --host=192.168.1.100 --db=myapp_db update
+#     ./scripts/lb.sh --external --host=192.168.1.100 --db=MBTL_INT_COBA --db-name=MBTL_INT_COBA --ver=v1.0 update
 #
 # RUNNER (auto-detect, bisa di-override):
 #   Script otomatis pakai Docker jika tersedia, fallback ke binary 'liquibase'
@@ -75,6 +79,8 @@ EXTERNAL_MODE=false
 OVERRIDE_HOST=""
 OVERRIDE_DB=""
 RUNNER_OVERRIDE=""   # kosong = auto-detect, "docker" atau "native"
+DB_NAME=""           # nama folder database, misal: MBTL_INT_COBA
+DB_VER=""            # versi changelog, misal: v1.0
 
 ARGS=()
 for arg in "$@"; do
@@ -87,6 +93,12 @@ for arg in "$@"; do
       ;;
     --db=*)
       OVERRIDE_DB="${arg#--db=}"
+      ;;
+    --db-name=*)
+      DB_NAME="${arg#--db-name=}"
+      ;;
+    --ver=*)
+      DB_VER="${arg#--ver=}"
       ;;
     --runner=*)
       RUNNER_OVERRIDE="${arg#--runner=}"
@@ -102,6 +114,144 @@ set -- "${ARGS[@]+"${ARGS[@]}"}"
 
 OPERATION="${1:-update}"
 shift || true   # sisa argumen diteruskan ke liquibase
+
+# ── Resolusi path changelog berdasarkan --db-name dan --ver ──
+# Jika --db-name dan --ver ditentukan, gunakan struktur:
+#   liquibase/{DB_NAME}/{VERSION}/changelog/db.changelog-master.xml
+if [ -n "$DB_NAME" ] && [ -n "$DB_VER" ]; then
+  LB_WORKDIR="$ROOT_DIR/liquibase/$DB_NAME/$DB_VER"
+  if [ ! -d "$LB_WORKDIR" ]; then
+    echo "❌ Folder tidak ditemukan: $LB_WORKDIR"
+    echo "   Pastikan folder liquibase/$DB_NAME/$DB_VER/ sudah ada."
+    exit 1
+  fi
+  CHANGELOG="changelog/db.changelog-master.xml"
+elif [ -n "$DB_NAME" ] || [ -n "$DB_VER" ]; then
+  echo "❌ Flag --db-name dan --ver harus digunakan bersamaan."
+  echo "   Contoh: --db-name=MBTL_INT_COBA --ver=v1.0"
+  exit 1
+else
+  LB_WORKDIR="$ROOT_DIR/liquibase"
+fi
+
+# ── Perintah generate-master: tidak butuh koneksi DB ─────────
+# Intercept sebelum deteksi runner & koneksi database
+if [ "$OPERATION" = "generate-master" ]; then
+  CHANGES_DIR="$LB_WORKDIR/changelog/changes"
+  ROLLBACK_DIR="$LB_WORKDIR/rollback"
+  MASTER_XML="$LB_WORKDIR/changelog/db.changelog-master.xml"
+
+  if [ ! -d "$CHANGES_DIR" ]; then
+    echo "❌ Folder tidak ditemukan: $CHANGES_DIR"
+    exit 1
+  fi
+
+  # Ambil author dari git config, fallback ke 'developer'
+  GIT_AUTHOR=$(git config user.name 2>/dev/null || echo "developer")
+
+  # Kumpulkan file .sql di folder changes/ secara terurut
+  SQL_FILES=()
+  while IFS= read -r -d '' f; do
+    SQL_FILES+=("$(basename "$f")")
+  done < <(find "$CHANGES_DIR" -maxdepth 1 -name "*.sql" -print0 | sort -z)
+
+  if [ ${#SQL_FILES[@]} -eq 0 ]; then
+    echo "⚠️  Tidak ada file .sql di: $CHANGES_DIR"
+    exit 1
+  fi
+
+  echo "═══════════════════════════════════════════════"
+  echo " generate-master"
+  echo " DB   : ${DB_NAME:-default}"
+  echo " Ver  : ${DB_VER:-default}"
+  echo " Src  : $CHANGES_DIR"
+  echo " Out  : $MASTER_XML"
+  echo "═══════════════════════════════════════════════"
+
+  # Tulis XML header
+  cat > "$MASTER_XML" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <!--
+        ⚠️  File ini di-generate OTOMATIS oleh:
+              ./scripts/lb.sh --db-name=... --ver=... generate-master
+
+           JANGAN diedit manual — perubahan akan tertimpa.
+
+           Cara menambah changeset baru:
+             1. Buat file SQL di : changelog/changes/000X-nama.sql
+             2. Buat rollback di : rollback/000X-rollback.sql
+             3. Jalankan        : ./scripts/lb.sh --db-name=... --ver=... generate-master
+    -->
+EOF
+
+  COUNT=0
+  WARN_COUNT=0
+
+  for SQL_FILE in "${SQL_FILES[@]}"; do
+    # Ambil prefix angka (misal "0001" dari "0001-create-table-users.sql")
+    PREFIX=$(echo "$SQL_FILE" | grep -oE '^[0-9]+')
+    CHANGESET_ID="${SQL_FILE%.sql}"
+
+    # Cari file rollback yang cocok: {PREFIX}-rollback.sql
+    ROLLBACK_FILE=""
+    if [ -d "$ROLLBACK_DIR" ]; then
+      ROLLBACK_FILE=$(find "$ROLLBACK_DIR" -maxdepth 1 -name "${PREFIX}-rollback.sql" 2>/dev/null | head -1)
+    fi
+
+    {
+      echo ""
+      echo "    <!-- ═══ ${CHANGESET_ID} ═══ -->"
+      echo "    <changeSet id=\"${CHANGESET_ID}\" author=\"${GIT_AUTHOR}\">"
+      echo "        <sqlFile path=\"changelog/changes/${SQL_FILE}\""
+      echo "                 relativeToChangelogFile=\"true\""
+      echo "                 splitStatements=\"true\""
+      echo "                 endDelimiter=\";\"/>"
+
+      if [ -n "$ROLLBACK_FILE" ]; then
+        ROLLBACK_BASENAME=$(basename "$ROLLBACK_FILE")
+        echo "        <rollback>"
+        echo "            <sqlFile path=\"rollback/${ROLLBACK_BASENAME}\""
+        echo "                     relativeToChangelogFile=\"true\""
+        echo "                     splitStatements=\"true\""
+        echo "                     endDelimiter=\";\"/>"
+        echo "        </rollback>"
+      else
+        echo "        <!-- ⚠️  rollback/${PREFIX}-rollback.sql tidak ditemukan — empty rollback -->"
+        echo "        <rollback/>"
+        WARN_COUNT=$((WARN_COUNT + 1))
+      fi
+
+      echo "    </changeSet>"
+    } >> "$MASTER_XML"
+
+    # Status per file
+    if [ -n "$ROLLBACK_FILE" ]; then
+      echo "  ✅ $SQL_FILE  →  $(basename "$ROLLBACK_FILE")"
+    else
+      echo "  ⚠️  $SQL_FILE  →  rollback/${PREFIX}-rollback.sql (TIDAK DITEMUKAN)"
+    fi
+
+    COUNT=$((COUNT + 1))
+  done
+
+  echo "" >> "$MASTER_XML"
+  echo "</databaseChangeLog>" >> "$MASTER_XML"
+
+  echo ""
+  echo "══════════════════════════════════"
+  echo " ✅ Selesai! db.changelog-master.xml berhasil di-generate."
+  echo "    Total changeset : $COUNT"
+  [ "$WARN_COUNT" -gt 0 ] && \
+    echo "    ⚠️  Missing rollback : $WARN_COUNT file (buat rollback/{PREFIX}-rollback.sql-nya!)"
+  echo "══════════════════════════════════"
+  exit 0
+fi
 
 # ── Deteksi runner (Docker atau native) ──────────────────────
 USE_DOCKER=false
@@ -234,14 +384,20 @@ if [ "$HAS_DEFAULTS_ARG" = false ]; then
   if [ ! -f "$LOCAL_PROPS" ]; then
     touch "$LOCAL_PROPS"
   fi
-  DEFAULTS_PARAM="--defaults-file=liquibase.local.properties"
+  # Path relatif dari LB_WORKDIR ke liquibase.local.properties
+  if [ -n "$DB_NAME" ] && [ -n "$DB_VER" ]; then
+    DEFAULTS_PARAM="--defaults-file=../../liquibase.local.properties"
+  else
+    DEFAULTS_PARAM="--defaults-file=liquibase.local.properties"
+  fi
 fi
 
 if [ "$USE_DOCKER" = true ]; then
   # ── Runner: Docker ──────────────────────────────────────────
+  # Mount seluruh folder DB+Version agar path relatif di XML bisa diakses
   docker run --rm \
     $NETWORK_FLAG \
-    -v "$ROOT_DIR/liquibase/changelog:/liquibase/changelog" \
+    -v "$LB_WORKDIR:/liquibase/workdir" \
     "$LIQUIBASE_IMAGE" \
     --url="$DB_URL" \
     --username="$DB_USER" \
@@ -252,7 +408,8 @@ if [ "$USE_DOCKER" = true ]; then
     "$@"
 else
   # ── Runner: Native binary ───────────────────────────────────
-  cd "$ROOT_DIR/liquibase"
+  # cd ke folder LB_WORKDIR agar path relatif di XML (changelog/ & rollback/) bisa diakses
+  cd "$LB_WORKDIR"
   liquibase \
     ${DEFAULTS_PARAM:+ "$DEFAULTS_PARAM"} \
     --url="$DB_URL" \
