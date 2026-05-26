@@ -275,10 +275,10 @@ Gunakan sebelum push ke GitHub untuk memastikan format changeset benar.
 
 ```bash
 # Rollback 1 changeset terakhir
-./scripts/lb.sh rollback --rollbackCount=1
+./scripts/lb.sh rollback-count --count=1
 
 # Rollback 3 changeset terakhir
-./scripts/lb.sh rollback --rollbackCount=3
+./scripts/lb.sh rollback-count --count=3
 ```
 
 ### Rollback ke Tag Tertentu
@@ -752,7 +752,7 @@ Script otomatis memilih **Docker** jika tersedia, fallback ke **native binary** 
 ./scripts/lb.sh status                         # Lihat changeset yang belum dijalankan
 ./scripts/lb.sh validate                       # Validasi format changelog
 ./scripts/lb.sh history                        # Lihat riwayat changeset
-./scripts/lb.sh rollback --rollbackCount=1     # Rollback 1 changeset terakhir
+./scripts/lb.sh rollback-count --count=1        # Rollback 1 changeset terakhir
 ./scripts/lb.sh rollback --rollbackToTag=v1.1  # Rollback ke tag
 ./scripts/lb.sh clearCheckSums                 # Reset checksum (DEV ONLY!)
 ./scripts/lb.sh diff                           # Bandingkan skema DB dengan changelog

@@ -8,17 +8,27 @@
 #   ./scripts/lb.sh validate
 #   ./scripts/lb.sh updateSQL
 #   ./scripts/lb.sh history
-#   ./scripts/lb.sh rollback --rollbackCount=1
+#   ./scripts/lb.sh rollback-count --count=1
 #   ./scripts/lb.sh rollback --rollbackToTag=v1.1
 #   ./scripts/lb.sh clearCheckSums
 #   ./scripts/lb.sh diff
 #   ./scripts/lb.sh generateChangeLog
 #   ./scripts/lb.sh changelogSync
+#   ./scripts/lb.sh dropAll
 #
 # MODE EXTERNAL DB (existing database):
 #   ./scripts/lb.sh --external update
-#   ./scripts/lb.sh --external generateChangeLog
 #   ./scripts/lb.sh --external status
+#   ./scripts/lb.sh --external validate
+#   ./scripts/lb.sh --external updateSQL
+#   ./scripts/lb.sh --external history
+#   ./scripts/lb.sh --external rollback-count --count=1
+#   ./scripts/lb.sh --external rollback --rollbackToTag=v1.1
+#   ./scripts/lb.sh --external clearCheckSums
+#   ./scripts/lb.sh --external diff
+#   ./scripts/lb.sh --external generateChangeLog
+#   ./scripts/lb.sh --external changelogSync
+#   ./scripts/lb.sh --external dropAll
 #
 #   Override koneksi via .env atau env var:
 #     EXT_DB_HOST=192.168.1.100 \
