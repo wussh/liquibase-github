@@ -205,7 +205,18 @@ INSERT INTO products (name, price, stock) VALUES ('Product B', 25000.00, 50);
 
 ## 4. Menjalankan Migrasi Lokal
 
-Gunakan helper script `scripts/lb.sh` atau langsung via `docker compose`:
+Gunakan helper script `scripts/lb.sh`. Script otomatis mendeteksi runner yang tersedia:
+
+| Kondisi | Runner yang Dipakai |
+|---|---|
+| Docker tersedia & daemon running | **Docker** (default) |
+| Docker tidak ada / daemon mati | **Native binary** `liquibase` (fallback) |
+| `--runner=docker` | Paksa Docker (error jika tidak ada) |
+| `--runner=native` | Paksa native binary (error jika tidak ada) |
+
+> [!NOTE]
+> Untuk menggunakan native binary, install Liquibase terlebih dahulu:
+> [docs.liquibase.com/start/install/home.html](https://docs.liquibase.com/start/install/home.html)
 
 ### Lihat Changeset yang Belum Dijalankan
 
@@ -225,7 +236,7 @@ Output berupa SQL yang akan dieksekusi — gunakan ini untuk review sebelum appl
 
 ```bash
 ./scripts/lb.sh update
-# atau
+# atau langsung via docker compose:
 docker compose run --rm liquibase
 ```
 
@@ -241,6 +252,16 @@ Gunakan sebelum push ke GitHub untuk memastikan format changeset benar.
 
 ```bash
 ./scripts/lb.sh history
+```
+
+### Override Runner
+
+```bash
+# Paksa pakai Docker
+./scripts/lb.sh --runner=docker update
+
+# Paksa pakai native binary
+./scripts/lb.sh --runner=native update
 ```
 
 ---
@@ -721,43 +742,54 @@ docker compose restart mysql
 
 ## 11. Referensi Perintah
 
-### Helper Script `./scripts/lb.sh` — Mode Default (Docker Internal)
+### Helper Script `./scripts/lb.sh` — Auto-detect Runner
+
+Script otomatis memilih **Docker** jika tersedia, fallback ke **native binary** `liquibase`.
 
 ```bash
-./scripts/lb.sh update                      # Apply semua pending changeset
-./scripts/lb.sh updateSQL                   # Preview SQL tanpa apply
-./scripts/lb.sh status                      # Lihat changeset yang belum dijalankan
-./scripts/lb.sh validate                    # Validasi format changelog
-./scripts/lb.sh history                     # Lihat riwayat changeset
-./scripts/lb.sh rollback --rollbackCount=1  # Rollback 1 changeset terakhir
+./scripts/lb.sh update                         # Apply semua pending changeset
+./scripts/lb.sh updateSQL                      # Preview SQL tanpa apply
+./scripts/lb.sh status                         # Lihat changeset yang belum dijalankan
+./scripts/lb.sh validate                       # Validasi format changelog
+./scripts/lb.sh history                        # Lihat riwayat changeset
+./scripts/lb.sh rollback --rollbackCount=1     # Rollback 1 changeset terakhir
 ./scripts/lb.sh rollback --rollbackToTag=v1.1  # Rollback ke tag
-./scripts/lb.sh clearCheckSums             # Reset checksum (DEV ONLY!)
-./scripts/lb.sh diff                        # Bandingkan skema DB dengan changelog
-./scripts/lb.sh generateChangeLog           # Generate changelog dari DB
-./scripts/lb.sh changelogSync               # Sync changelog tanpa eksekusi SQL
-./scripts/lb.sh changelogSyncSQL            # Preview SQL sync
+./scripts/lb.sh clearCheckSums                 # Reset checksum (DEV ONLY!)
+./scripts/lb.sh diff                           # Bandingkan skema DB dengan changelog
+./scripts/lb.sh generateChangeLog              # Generate changelog dari DB
+./scripts/lb.sh changelogSync                  # Sync changelog tanpa eksekusi SQL
+./scripts/lb.sh changelogSyncSQL               # Preview SQL sync
 ```
 
-### Helper Script `./scripts/lb.sh` — Mode External DB
+### Override Runner
 
 ```bash
-# Semua perintah di atas bisa dipakai dengan flag --external
+./scripts/lb.sh --runner=docker update         # Paksa Docker
+./scripts/lb.sh --runner=native update         # Paksa native binary
+```
+
+### Mode External DB
+
+```bash
+# Semua perintah bisa dikombinasikan dengan --external
 ./scripts/lb.sh --external update
 ./scripts/lb.sh --external status
 ./scripts/lb.sh --external history
 ./scripts/lb.sh --external generateChangeLog
 ./scripts/lb.sh --external changelogSync
 
-# Override host & db langsung via flag
+# Override host & db via flag
 ./scripts/lb.sh --external --host=192.168.1.100 --db=myapp_db update
 
-# Override semua koneksi via env var
+# Override via env var
 EXT_DB_HOST=192.168.1.100 \
-EXT_DB_PORT=3306 \
 EXT_DB_NAME=myapp_db \
 EXT_DB_USER=admin \
 EXT_DB_PASS=secret \
 ./scripts/lb.sh --external update
+
+# Kombinasi: native runner + external DB
+./scripts/lb.sh --runner=native --external update
 ```
 
 ### Docker Compose
