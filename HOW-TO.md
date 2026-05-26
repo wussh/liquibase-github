@@ -14,8 +14,9 @@ Panduan langkah demi langkah — dari setup awal sampai deploy production.
 6. [Setup GitHub Secrets](#6-setup-github-secrets)
 7. [Setup Environment Protection (Manual Approval)](#7-setup-environment-protection-manual-approval)
 8. [Deploy via GitHub Actions](#8-deploy-via-github-actions)
-9. [Troubleshooting](#9-troubleshooting)
-10. [Referensi Perintah](#10-referensi-perintah)
+9. [Onboarding DB yang Sudah Ada (Existing Database)](#9-onboarding-db-yang-sudah-ada-existing-database)
+10. [Troubleshooting](#10-troubleshooting)
+11. [Referensi Perintah](#11-referensi-perintah)
 
 ---
 
@@ -380,7 +381,147 @@ Pipeline akan berjalan:
 
 ---
 
-## 9. Troubleshooting
+## 9. Onboarding DB yang Sudah Ada (Existing Database)
+
+> [!IMPORTANT]
+> Gunakan section ini jika kamu sudah punya database dengan tabel-tabel yang berjalan
+> dan ingin mulai menggunakan Liquibase **tanpa menghapus atau membuat ulang** database tersebut.
+
+### Gambaran Alur
+
+```
+DB Existing (sudah ada tabel)
+    │
+    ▼
+[1] generateChangelog  ──▶  000-baseline.sql (DDL semua objek existing)
+    │
+    ▼
+[2] changelogSync      ──▶  Isi DATABASECHANGELOG (tandai baseline sebagai "done")
+    │
+    ▼
+[3] Buat changeset baru normal (v1.1, v1.2, dst.)
+    │
+    ▼
+[4] liquibase update   ──▶  Hanya jalankan changeset BARU saja
+```
+
+---
+
+### Langkah 1 — Generate Baseline Changelog dari DB Existing
+
+Liquibase akan connect ke database existing, membaca semua tabel, kolom, index, dan foreign key, lalu menuangkannya ke file changelog:
+
+```bash
+./scripts/lb.sh generateChangelog --changelogFile=changelog/changes/v1.0/000-baseline.sql
+```
+
+File `000-baseline.sql` yang dihasilkan akan berisi DDL semua objek yang sudah ada, misalnya:
+
+```sql
+--liquibase formatted sql
+
+--changeset liquibase-generated:1 labels:v1.0 context:all
+CREATE TABLE users (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    name       VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_users PRIMARY KEY (id)
+);
+--rollback DROP TABLE IF EXISTS users;
+
+--changeset liquibase-generated:2 labels:v1.0 context:all
+CREATE TABLE orders (
+    id         BIGINT    NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT    NOT NULL,
+    total      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_orders PRIMARY KEY (id)
+);
+--rollback DROP TABLE IF EXISTS orders;
+```
+
+> [!NOTE]
+> Review file hasil generate ini sebelum lanjut — pastikan semua tabel dan kolom sudah tercapture dengan benar.
+
+---
+
+### Langkah 2 — Sync Changelog ke DB (Tanpa Eksekusi SQL)
+
+Karena tabel-tabel tersebut **sudah ada** di database, kita perlu memberi tahu Liquibase bahwa changeset baseline sudah "pernah dijalankan" — tanpa benar-benar mengeksekusi DDL-nya:
+
+```bash
+./scripts/lb.sh changelogSync
+```
+
+Perintah ini akan:
+- Membuat tabel `DATABASECHANGELOG` dan `DATABASECHANGELOGLOCK` jika belum ada
+- Mengisi `DATABASECHANGELOG` dengan semua entry dari baseline changelog
+- **Tidak mengeksekusi satu pun SQL DDL** (tabel tidak disentuh)
+
+Verifikasi hasilnya:
+
+```bash
+./scripts/lb.sh history
+# OUTPUT:
+# ID: 1  Author: liquibase-generated  File: 000-baseline.sql  Status: EXECUTED
+# ID: 2  Author: liquibase-generated  File: 000-baseline.sql  Status: EXECUTED
+```
+
+---
+
+### Langkah 3 — Verifikasi Status
+
+Pastikan tidak ada changeset yang pending (semua sudah ter-sync):
+
+```bash
+./scripts/lb.sh status
+# OUTPUT:
+# liquibase-github is up to date
+# 0 change sets have not been applied
+```
+
+---
+
+### Langkah 4 — Mulai Buat Changeset Baru Seperti Biasa
+
+Setelah baseline ter-sync, kamu bisa lanjut membuat changeset baru untuk perubahan ke depannya:
+
+```bash
+# Buat folder versi berikutnya
+mkdir -p liquibase/changelog/changes/v1.1
+
+# Buat changeset baru
+cat > liquibase/changelog/changes/v1.1/001-add-email-column.sql << 'EOF'
+--liquibase formatted sql
+
+--changeset developer:v1.1-001-add-email-column labels:v1.1 context:all
+ALTER TABLE users ADD COLUMN email VARCHAR(255) NULL AFTER name;
+--rollback ALTER TABLE users DROP COLUMN email;
+EOF
+
+# Apply hanya changeset baru ini
+./scripts/lb.sh update
+```
+
+> [!WARNING]
+> **Jangan edit file `000-baseline.sql`** setelah `changelogSync` dijalankan.
+> Liquibase menyimpan checksum MD5 — mengubah file akan menyebabkan error `Checksum mismatch`.
+
+---
+
+### Alternatif: `changelogSyncSQL` untuk Preview Dulu
+
+Jika ingin melihat SQL yang akan diinsert ke `DATABASECHANGELOG` sebelum benar-benar dijalankan:
+
+```bash
+./scripts/lb.sh changelogSyncSQL
+```
+
+Output berupa `INSERT INTO DATABASECHANGELOG ...` — cocok untuk review atau audit.
+
+---
+
+## 10. Troubleshooting
 
 ### ❌ Error: `Cannot find database driver`
 
@@ -457,7 +598,7 @@ docker compose restart mysql
 
 ---
 
-## 10. Referensi Perintah
+## 11. Referensi Perintah
 
 ### Helper Script `./scripts/lb.sh`
 
