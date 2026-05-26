@@ -140,13 +140,13 @@ if [ "$EXTERNAL_MODE" = true ]; then
 
   # Native mode: bisa pakai localhost langsung (tidak perlu host network trick)
   if [ "$USE_NATIVE" = true ]; then
-    DB_URL="jdbc:mysql://${EXT_HOST}:${EXT_PORT}/${EXT_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+    DB_URL="jdbc:mysql://${EXT_HOST}:${EXT_PORT}/${EXT_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&allowMultiQueries=true"
   else
     # Docker: jika host adalah localhost/127.0.0.1, gunakan host.docker.internal
     if [[ "$EXT_HOST" == "127.0.0.1" || "$EXT_HOST" == "localhost" ]]; then
-      DB_URL="jdbc:mysql://host.docker.internal:${EXT_PORT}/${EXT_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+      DB_URL="jdbc:mysql://host.docker.internal:${EXT_PORT}/${EXT_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&allowMultiQueries=true"
     else
-      DB_URL="jdbc:mysql://${EXT_HOST}:${EXT_PORT}/${EXT_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+      DB_URL="jdbc:mysql://${EXT_HOST}:${EXT_PORT}/${EXT_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&allowMultiQueries=true"
     fi
   fi
 
@@ -219,7 +219,12 @@ fi
 # Hindari konflik dengan file default 'liquibase.properties' pada runner native
 DEFAULTS_PARAM=""
 if [ "$HAS_DEFAULTS_ARG" = false ]; then
-  DEFAULTS_PARAM="--defaults-file=/dev/null"
+  # Buat file kosong local.properties jika belum ada (file ini sudah di-ignore di .gitignore)
+  LOCAL_PROPS="$ROOT_DIR/liquibase/liquibase.local.properties"
+  if [ ! -f "$LOCAL_PROPS" ]; then
+    touch "$LOCAL_PROPS"
+  fi
+  DEFAULTS_PARAM="--defaults-file=liquibase.local.properties"
 fi
 
 if [ "$USE_DOCKER" = true ]; then
