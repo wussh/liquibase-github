@@ -69,7 +69,7 @@ Liquibase adalah tools **database version control**. Sama seperti Git untuk kode
 
 ## 3. Struktur Folder Project
 
-Struktur folder menggunakan **Opsi B** (folder `changes` dan `rollback` berada langsung di bawah folder versi, TANPA subfolder `changelog`):
+Struktur folder menggunakan **Opsi B** (folder `changes` dan `rollback` berada langsung di bawah folder feature, TANPA subfolder `changelog`):
 
 ```
 liquibase-github/
@@ -83,7 +83,7 @@ liquibase-github/
 └── liquibase/
     ├── liquibase.local.properties      ← Dibuat otomatis, git-ignored
     └── {NAMA_DATABASE}/                ← Satu folder per database (misal: db1)
-        └── {VERSI}/                    ← Satu folder per versi (v.1.0, v.1.1, ...)
+        └── {FEATURE}/                  ← Satu folder per feature (RTIMOR, TRXINT, ...)
             ├── db.changelog-master.xml ← Di-generate OTOMATIS oleh generate-master
             ├── changes/                ← SQL forward migration (CREATE, ALTER, INSERT)
             │   ├── 0001-init-table.sql
@@ -140,7 +140,7 @@ docker compose up -d mysql
 ./scripts/lb.sh status
 
 # Mode External (database target existing di luar)
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 status
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR status
 ```
 
 ---
@@ -153,10 +153,10 @@ docker compose up -d mysql
 
 ### Langkah 1 — Buat File SQL di Folder `changes/`
 
-Buat file SQL di folder `liquibase/{NAMA_DB}/{VERSI}/changes/`:
+Buat file SQL di folder `liquibase/{NAMA_DB}/{FEATURE}/changes/`:
 
 ```sql
--- File: liquibase/db1/v.1.0/changes/0007-add-column-user-status.sql
+-- File: liquibase/db1/RTIMOR/changes/0007-add-column-user-status.sql
 
 ALTER TABLE `users`
   ADD COLUMN `user_status` VARCHAR(20) DEFAULT 'active';
@@ -169,11 +169,11 @@ ALTER TABLE `users`
 
 ### Langkah 2 — Buat File SQL Rollback di Folder `rollback/`
 
-Buat file rollback di folder `liquibase/{NAMA_DB}/{VERSI}/rollback/` sebagai kebalikan dari file `changes/`.
+Buat file rollback di folder `liquibase/{NAMA_DB}/{FEATURE}/rollback/` sebagai kebalikan dari file `changes/`.
 Konvensi nama: **{NOMOR_SAMA}-rollback.sql**
 
 ```sql
--- File: liquibase/db1/v.1.0/rollback/0007-rollback.sql
+-- File: liquibase/db1/RTIMOR/rollback/0007-rollback.sql
 
 ALTER TABLE `users`
   DROP COLUMN `user_status`;
@@ -193,10 +193,10 @@ ALTER TABLE `users`
 
 ```bash
 # 1. Generate ulang db.changelog-master.xml secara otomatis
-./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
 
 # 2. Commit semua file (2 SQL + 1 XML hasil generate)
-git add liquibase/db1/v.1.0/
+git add liquibase/db1/RTIMOR/
 git commit -m "feat(db): add user_status column to users table"
 git push
 ```
@@ -210,7 +210,7 @@ Perintah `generate-master` memindai folder `changes/` and `rollback/`, lalu memb
 ### Cara Pakai
 
 ```bash
-./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
 ```
 
 ### Contoh Output
@@ -218,11 +218,11 @@ Perintah `generate-master` memindai folder `changes/` and `rollback/`, lalu memb
 ```
 ═══════════════════════════════════════════════
  generate-master
- DB     : db1
- Ver    : v.1.0
- Mode   : opsiB
- Src    : .../db1/v.1.0/changes
- Out    : .../db1/v.1.0/db.changelog-master.xml
+ DB      : db1
+ Feature : RTIMOR
+ Mode    : opsiB
+ Src     : .../db1/RTIMOR/changes
+ Out     : .../db1/RTIMOR/db.changelog-master.xml
 ═══════════════════════════════════════════════
   ✅ 0001-create-table-users.sql      →  0001-rollback.sql
   ✅ 0002-add-column-users.sql         →  0002-rollback.sql
@@ -259,23 +259,23 @@ Perintah `generate-master` memindai folder `changes/` and `rollback/`, lalu memb
 ### Mode External (Database Target Existing)
 
 ```bash
-# Format: --external --db-name=NAMA_DB --ver=VERSI
+# Format: --external --db-name=NAMA_DB --feature=NAMA_FEATURE
 
 # Lihat status
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 status
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR status
 
 # Preview SQL
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 updateSQL
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR updateSQL
 
 # Terapkan perubahan
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR update
 ```
 
 ### Override Koneksi via Command Line
 
 ```bash
 # Override host dan DB name target saat menjalankan update
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 \
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR \
   --host=192.168.1.100 --db=my_target_db update
 ```
 
@@ -290,33 +290,33 @@ Perintah `generate-master` memindai folder `changes/` and `rollback/`, lalu memb
 
 ```bash
 # Rollback 1 changeset terakhir
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 rollback-count --count=1
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR rollback-count --count=1
 
 # Rollback 3 changeset terakhir
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 rollback-count --count=3
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR rollback-count --count=3
 ```
 
 > [!TIP]
 > Preview SQL rollback terlebih dahulu untuk memastikan tidak ada kesalahan:
 > ```bash
-> ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 rollback-count-sql --count=1
+> ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR rollback-count-sql --count=1
 > ```
 
 ### Rollback ke Tag Checkpoint
 
 1. Tandai titik aman (checkpoint) sebelum melakukan migrasi baru:
    ```bash
-   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 tag --tag=before-v1.1
+   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR tag --tag=before-TRXINT
    ```
 
-2. Terapkan versi baru:
+2. Terapkan feature baru:
    ```bash
-   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.1 update
+   ./scripts/lb.sh --external --db-name=db1 --feature=TRXINT update
    ```
 
 3. Jika terjadi masalah, rollback database kembali ke tag checkpoint:
    ```bash
-   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.1 rollback --tag=before-v1.1
+   ./scripts/lb.sh --external --db-name=db1 --feature=TRXINT rollback --tag=before-TRXINT
    ```
 
 ### Aturan Rollback: Harus Berurutan (LIFO), Tidak Bisa Lompat
@@ -347,8 +347,8 @@ Caranya adalah membuat **changeset baru** yang isinya membatalkan perubahan chan
    ```
 3. **Generate master XML dan jalankan update**:
    ```bash
-   ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
-   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
+   ./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
+   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR update
    ```
 
 ---
@@ -363,13 +363,13 @@ Jika kamu sudah membuat file SQL di folder `changes/` yang isinya sama persis de
 
 ```bash
 # 1. Generate master XML dari file changes/ yang ada
-./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
 
 # 2. Sync changelog (menandai changeset sebagai EXECUTED di DATABASECHANGELOG)
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 changelogSync
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR changelogSync
 
 # 3. Verifikasi (status seharusnya menunjukkan 0 changeset pending)
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 status
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR status
 ```
 
 ### Skenario 2 — Generate Baseline Baru dari DB Existing
@@ -378,18 +378,18 @@ Jika kamu ingin mengekspor seluruh struktur database existing ke dalam file SQL 
 
 ```bash
 # 1. Generate skema database ke file SQL baru
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 generateChangeLog \
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR generateChangeLog \
   --changelog-file=changes/0001-baseline.sql
 
 # 2. Buat rollback baseline secara manual
 #    (isi file ini dengan perintah DROP TABLE untuk semua tabel di baseline.sql)
-vim liquibase/db1/v.1.0/rollback/0001-rollback.sql
+vim liquibase/db1/RTIMOR/rollback/0001-rollback.sql
 
 # 3. Generate master XML
-./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
 
 # 4. Sync agar database mengenali baseline ini (tabel sudah ada di DB)
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 changelogSync
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR changelogSync
 ```
 
 ### Skenario 3 — Menambah Changeset Baru Setelah Onboarding
@@ -399,23 +399,23 @@ Skenario paling umum: database production sudah ada datanya, dan kamu ingin mula
 ```bash
 # 1. Buat changeset kosong (baseline marker)
 echo "-- Baseline: existing tables before Liquibase management" \
-  > liquibase/db1/v.1.0/changes/0001-baseline-existing.sql
+  > liquibase/db1/RTIMOR/changes/0001-baseline-existing.sql
 
 # Rollback baseline kosong karena tabel sudah ada sebelum Liquibase
 echo "-- No rollback for baseline" \
-  > liquibase/db1/v.1.0/rollback/0001-rollback.sql
+  > liquibase/db1/RTIMOR/rollback/0001-rollback.sql
 
 # 2. Generate XML & Sync database existing
-./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 changelogSync
+./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR changelogSync
 
 # 3. Buat changeset perubahan berikutnya seperti biasa
-vim liquibase/db1/v.1.0/changes/0002-add-new-column.sql
-vim liquibase/db1/v.1.0/rollback/0002-rollback.sql
+vim liquibase/db1/RTIMOR/changes/0002-add-new-column.sql
+vim liquibase/db1/RTIMOR/rollback/0002-rollback.sql
 
 # 4. Generate-master & Apply update (hanya menjalankan changeset 0002 ke atas)
-./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
+./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR update
 ```
 
 ---
@@ -428,21 +428,21 @@ Cukup buat folder database baru di dalam `liquibase/`:
 
 ```
 liquibase/
-├── db1/                  ← Database pertama
-│   ├── v.1.0/
-│   └── v.1.1/
-└── db_payment/           ← Database kedua
-    ├── v.1.0/
-    └── v.2.0/
+├── db1/                   ← Database pertama
+│   ├── RTIMOR/
+│   └── TRXINT/
+└── db_payment/            ← Database kedua
+    ├── FEATURE_A/
+    └── FEATURE_B/
 ```
 
 ### Apply Migrasi Spesifik
 
-Tentukan `--db-name` dan `--ver` database tujuan saat memanggil helper:
+Tentukan `--db-name` dan `--feature` database tujuan saat memanggil helper:
 
 ```bash
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
-./scripts/lb.sh --external --db-name=db_payment --ver=v.1.0 update
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR update
+./scripts/lb.sh --external --db-name=db_payment --feature=FEATURE_A update
 ```
 
 ---
@@ -452,25 +452,25 @@ Tentukan `--db-name` dan `--ver` database tujuan saat memanggil helper:
 ### Lihat Riwayat Migrasi
 
 ```bash
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 history
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR history
 ```
 
 ### Validasi Format File Changelog
 
 ```bash
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 validate
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR validate
 ```
 
 ### Lihat Perbedaan Skema (Diff)
 
 ```bash
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 diff
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR diff
 ```
 
 ### Reset Checksum (Jika File SQL Terpaksa Diedit di Local Dev)
 
 ```bash
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 clearCheckSums
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR clearCheckSums
 ```
 
 ---
@@ -522,13 +522,13 @@ Mengintegrasikan Liquibase dengan Bamboo sangat mudah karena kita menggunakan sc
 * **Script Body:**
   ```bash
   # 1. Pastikan XML up-to-date
-  ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+  ./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
 
   # 2. Validasi format XML/SQL
-  ./scripts/lb.sh --db-name=db1 --ver=v.1.0 validate
+  ./scripts/lb.sh --db-name=db1 --feature=RTIMOR validate
 
   # 3. Dry-run updateSQL ke database testing
-  ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 updateSQL
+  ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR updateSQL
   ```
 
 #### B. Task pada Deployment Project (Tahap Eksekusi)
@@ -542,7 +542,7 @@ Mengintegrasikan Liquibase dengan Bamboo sangat mudah karena kita menggunakan sc
   export EXT_DB_PASS="${bamboo.db.password}"
 
   # Jalankan migrasi
-  ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 --db="${bamboo.db.name}" update
+  ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR --db="${bamboo.db.name}" update
   ```
 
 ---
@@ -571,8 +571,8 @@ DB_DB_PAYMENT_NAME=payment_prod
 ```
 Lalu panggil script secara berurutan:
 ```bash
-./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
-./scripts/lb.sh --external --db-name=db_payment --ver=v.1.0 update
+./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR update
+./scripts/lb.sh --external --db-name=db_payment --feature=FEATURE_A update
 ```
 
 #### Skenario B: Menggunakan Jobs Paralel Bamboo (Cepat)
@@ -597,10 +597,11 @@ DB_DB2_NAME=mbtl_payment
 Lalu jalankan menggunakan looping di Bash task Bamboo:
 ```bash
 DATABASES=("db1" "db2" "db3")
+FEATURE="RTIMOR"
 
 for db in "${DATABASES[@]}"; do
   echo "Running migration for database: $db"
-  ./scripts/lb.sh --external --db-name="$db" --ver=v.1.0 update
+  ./scripts/lb.sh --external --db-name="$db" --feature="$FEATURE" update
 done
 ```
 
@@ -635,11 +636,11 @@ Script akan mengeluarkan output seperti berikut jika mendeteksi adanya penambaha
  Commit Range: HEAD~1
 ==================================================
 Database yang terdeteksi mengalami perubahan:
-  📍 Database: db1  |  Versi: v.1.0
+  📍 Database: db1  |  Feature: RTIMOR
 ==================================================
-🚀 Memulai deploy untuk database: db1 (v.1.0)...
+🚀 Memulai deploy untuk database: db1 (RTIMOR)...
 ...
-✅ Berhasil deploy database: db1 (v.1.0)
+✅ Berhasil deploy database: db1 (RTIMOR)
 --------------------------------------------------
 🎉 Semua proses deployment database selesai!
 ```
@@ -692,7 +693,7 @@ Buka repository GitHub → **Settings** → **Secrets and variables** → **Acti
 |---|---|---|
 | `--external` | `--external` | Gunakan koneksi database external |
 | `--db-name` | `--db-name=db1` | Nama database (sesuai folder di `liquibase/`) |
-| `--ver` | `--ver=v.1.0` | Versi changelog yang dituju |
+| `--feature` | `--feature=RTIMOR` | Nama feature/folder changelog yang dituju |
 | `--host` | `--host=1.2.3.4` | Override host target |
 | `--db` | `--db=target_db` | Override nama schema target |
 | `--runner` | `--runner=native` | Gunakan runner `docker` atau `native` |

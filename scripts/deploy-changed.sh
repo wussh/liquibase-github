@@ -3,8 +3,8 @@
 # Script Deteksi & Deploy Otomatis Database Berdasarkan Perubahan Commit (Git)
 #
 # Cara Kerja:
-#   1. Memeriksa file .sql baru/berubah di: liquibase/{DB_NAME}/{VER}/changes/
-#   2. Mengekstrak DB_NAME dan VER.
+#   1. Memeriksa file .sql baru/berubah di: liquibase/{DB_NAME}/{FEATURE}/changes/
+#   2. Mengekstrak DB_NAME dan FEATURE.
 #   3. Menjalankan generate-master dan update ke database yang sesuai.
 #
 # Cara Pakai di CI/CD (Bamboo):
@@ -24,7 +24,7 @@ echo " Commit Range: $COMMIT_RANGE"
 echo "=================================================="
 
 # Ambil daftar file .sql yang berubah di folder changes/
-# Filter regex untuk memastikan folder berstruktur: liquibase/{DB}/{VER}/changes/*.sql
+# Filter regex untuk memastikan folder berstruktur: liquibase/{DB}/{FEATURE}/changes/*.sql
 CHANGED_FILES=$(git diff --name-only "$COMMIT_RANGE" -- "liquibase/*/*/changes/*.sql" 2>/dev/null || true)
 
 if [ -z "$CHANGED_FILES" ]; then
@@ -32,38 +32,38 @@ if [ -z "$CHANGED_FILES" ]; then
   exit 0
 fi
 
-# Ekstrak database & versi unik ke dalam associative array untuk menghindari duplikasi
+# Ekstrak database & feature unik ke dalam associative array untuk menghindari duplikasi
 declare -A TARGETS
 
 while IFS= read -r file; do
   if [ -n "$file" ] && [[ "$file" =~ ^liquibase/([^/]+)/([^/]+)/changes/ ]]; then
     DB="${BASH_REMATCH[1]}"
-    VER="${BASH_REMATCH[2]}"
-    TARGETS["$DB:$VER"]=1
+    FEATURE="${BASH_REMATCH[2]}"
+    TARGETS["$DB:$FEATURE"]=1
   fi
 done <<< "$CHANGED_FILES"
 
 echo "Database yang terdeteksi mengalami perubahan:"
 for key in "${!TARGETS[@]}"; do
-  IFS=":" read -r DB VER <<< "$key"
-  echo "  📍 Database: $DB  |  Versi: $VER"
+  IFS=":" read -r DB FEATURE <<< "$key"
+  echo "  📍 Database: $DB  |  Feature: $FEATURE"
 done
 echo "=================================================="
 
-# Eksekusi migrasi untuk setiap database & versi yang terdeteksi
+# Eksekusi migrasi untuk setiap database & feature yang terdeteksi
 for key in "${!TARGETS[@]}"; do
-  IFS=":" read -r DB VER <<< "$key"
+  IFS=":" read -r DB FEATURE <<< "$key"
   
-  echo "🚀 Memulai deploy untuk database: $DB ($VER)..."
+  echo "🚀 Memulai deploy untuk database: $DB ($FEATURE)..."
   
   # 1. Pastikan XML master diperbarui secara otomatis
-  "$SCRIPT_DIR/lb.sh" --db-name="$DB" --ver="$VER" generate-master
+  "$SCRIPT_DIR/lb.sh" --db-name="$DB" --feature="$FEATURE" generate-master
   
   # 2. Terapkan migrasi ke database external target
   # (Koneksi host/user/pass otomatis di-resolve oleh lb.sh dari .env)
-  "$SCRIPT_DIR/lb.sh" --external --db-name="$DB" --ver="$VER" update
+  "$SCRIPT_DIR/lb.sh" --external --db-name="$DB" --feature="$FEATURE" update
   
-  echo "✅ Berhasil deploy database: $DB ($VER)"
+  echo "✅ Berhasil deploy database: $DB ($FEATURE)"
   echo "--------------------------------------------------"
 done
 

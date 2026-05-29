@@ -4,39 +4,39 @@
 #
 # STRUKTUR FOLDER yang DIDUKUNG (auto-detect):
 #
-#   Opsi A — Versi di level atas, changelog/ di dalam versi:
-#     liquibase/{DB}/{VER}/changelog/changes/0001-*.sql
-#     liquibase/{DB}/{VER}/rollback/0001-rollback.sql
-#     liquibase/{DB}/{VER}/changelog/db.changelog-master.xml
+#   Opsi A — Feature di level atas, changelog/ di dalam feature:
+#     liquibase/{DB}/{FEATURE}/changelog/changes/0001-*.sql
+#     liquibase/{DB}/{FEATURE}/rollback/0001-rollback.sql
+#     liquibase/{DB}/{FEATURE}/changelog/db.changelog-master.xml
 #
-#   Opsi B — Versi di level atas, changes/ langsung (TANPA changelog/):
-#     liquibase/{DB}/{VER}/changes/0001-*.sql
-#     liquibase/{DB}/{VER}/rollback/0001-rollback.sql
-#     liquibase/{DB}/{VER}/db.changelog-master.xml
+#   Opsi B — Feature di level atas, changes/ langsung (TANPA changelog/):
+#     liquibase/{DB}/{FEATURE}/changes/0001-*.sql
+#     liquibase/{DB}/{FEATURE}/rollback/0001-rollback.sql
+#     liquibase/{DB}/{FEATURE}/db.changelog-master.xml
 #
 # GENERATE MASTER XML (tidak perlu koneksi DB):
-#   ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+#   ./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master
 #
 # MODE EXTERNAL DB:
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 status
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 rollback-count --count=1
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 rollback --tag=TAG
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 tag --tag=TAG
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 history
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 validate
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 updateSQL
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 clearCheckSums
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 changelogSync
-#   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 dropAll
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR update
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR status
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR rollback-count --count=1
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR rollback --tag=TAG
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR tag --tag=TAG
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR history
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR validate
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR updateSQL
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR clearCheckSums
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR changelogSync
+#   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR dropAll
 #
 #   Override koneksi:
-#     ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 --host=1.2.3.4 update
-#     EXT_DB_HOST=1.2.3.4 ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
+#     ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR --host=1.2.3.4 update
+#     EXT_DB_HOST=1.2.3.4 ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR update
 #
 # RUNNER (auto-detect, bisa di-override):
-#   ./scripts/lb.sh --runner=docker  --external --db-name=db1 --ver=v.1.0 update
-#   ./scripts/lb.sh --runner=native  --external --db-name=db1 --ver=v.1.0 update
+#   ./scripts/lb.sh --runner=docker  --external --db-name=db1 --feature=RTIMOR update
+#   ./scripts/lb.sh --runner=native  --external --db-name=db1 --feature=RTIMOR update
 # =============================================================
 set -euo pipefail
 
@@ -68,18 +68,18 @@ OVERRIDE_HOST=""
 OVERRIDE_DB=""
 RUNNER_OVERRIDE=""
 DB_NAME=""
-DB_VER=""
+DB_FEATURE=""
 
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
-    --external)   EXTERNAL_MODE=true ;;
-    --host=*)     OVERRIDE_HOST="${arg#--host=}" ;;
-    --db=*)       OVERRIDE_DB="${arg#--db=}" ;;
-    --db-name=*)  DB_NAME="${arg#--db-name=}" ;;
-    --ver=*)      DB_VER="${arg#--ver=}" ;;
-    --runner=*)   RUNNER_OVERRIDE="${arg#--runner=}" ;;
-    *)            ARGS+=("$arg") ;;
+    --external)    EXTERNAL_MODE=true ;;
+    --host=*)      OVERRIDE_HOST="${arg#--host=}" ;;
+    --db=*)        OVERRIDE_DB="${arg#--db=}" ;;
+    --db-name=*)   DB_NAME="${arg#--db-name=}" ;;
+    --feature=*)   DB_FEATURE="${arg#--feature=}" ;;
+    --runner=*)    RUNNER_OVERRIDE="${arg#--runner=}" ;;
+    *)             ARGS+=("$arg") ;;
   esac
 done
 
@@ -90,8 +90,8 @@ shift || true
 
 # ── Resolusi path & auto-detect struktur folder ──────────────
 #
-#  STRUCT_MODE="opsiA"   → {DB}/{VER}/changelog/changes/  + {DB}/{VER}/rollback/
-#  STRUCT_MODE="opsiB"   → {DB}/{VER}/changes/            + {DB}/{VER}/rollback/
+#  STRUCT_MODE="opsiA"   → {DB}/{FEATURE}/changelog/changes/  + {DB}/{FEATURE}/rollback/
+#  STRUCT_MODE="opsiB"   → {DB}/{FEATURE}/changes/            + {DB}/{FEATURE}/rollback/
 #  STRUCT_MODE="default" → liquibase/ (tanpa --db-name)
 #
 STRUCT_MODE="default"
@@ -99,35 +99,35 @@ LB_WORKDIR="$ROOT_DIR/liquibase"
 CHANGELOG="db.changelog-master.xml"
 
 if [ -n "$DB_NAME" ]; then
-  if [ -z "$DB_VER" ]; then
-    echo "❌ Flag --ver wajib digunakan bersama --db-name."
-    echo "   Contoh: --db-name=db1 --ver=v.1.0"
+  if [ -z "$DB_FEATURE" ]; then
+    echo "❌ Flag --feature wajib digunakan bersama --db-name."
+    echo "   Contoh: --db-name=db1 --feature=RTIMOR"
     exit 1
   fi
 
-  VER_DIR="$ROOT_DIR/liquibase/$DB_NAME/$DB_VER"
-  if [ ! -d "$VER_DIR" ]; then
-    echo "❌ Folder tidak ditemukan: $VER_DIR"
-    echo "   Pastikan folder liquibase/$DB_NAME/$DB_VER/ sudah ada."
+  FEATURE_DIR="$ROOT_DIR/liquibase/$DB_NAME/$DB_FEATURE"
+  if [ ! -d "$FEATURE_DIR" ]; then
+    echo "❌ Folder tidak ditemukan: $FEATURE_DIR"
+    echo "   Pastikan folder liquibase/$DB_NAME/$DB_FEATURE/ sudah ada."
     exit 1
   fi
 
-  if [ -d "$VER_DIR/changelog" ]; then
+  if [ -d "$FEATURE_DIR/changelog" ]; then
     # Opsi A: ada sub-folder changelog/
     STRUCT_MODE="opsiA"
-    LB_WORKDIR="$VER_DIR"
+    LB_WORKDIR="$FEATURE_DIR"
     CHANGELOG="changelog/db.changelog-master.xml"
     CHANGES_REL="changelog/changes"
     ROLLBACK_REL="rollback"
-  elif [ -d "$VER_DIR/changes" ]; then
-    # Opsi B: changes/ langsung di dalam versi (TANPA changelog/)
+  elif [ -d "$FEATURE_DIR/changes" ]; then
+    # Opsi B: changes/ langsung di dalam feature (TANPA changelog/)
     STRUCT_MODE="opsiB"
-    LB_WORKDIR="$VER_DIR"
+    LB_WORKDIR="$FEATURE_DIR"
     CHANGELOG="db.changelog-master.xml"
     CHANGES_REL="changes"
     ROLLBACK_REL="rollback"
   else
-    echo "❌ Tidak dapat mendeteksi struktur folder di: $VER_DIR"
+    echo "❌ Tidak dapat mendeteksi struktur folder di: $FEATURE_DIR"
     echo "   Pastikan ada folder 'changelog/changes/' (Opsi A)"
     echo "   atau folder 'changes/' (Opsi B) di dalamnya."
     exit 1
@@ -137,8 +137,8 @@ fi
 # ── Perintah generate-master: tidak butuh koneksi DB ─────────
 if [ "$OPERATION" = "generate-master" ]; then
   if [ "$STRUCT_MODE" = "default" ]; then
-    echo "❌ generate-master memerlukan --db-name dan --ver."
-    echo "   Contoh: ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master"
+    echo "❌ generate-master memerlukan --db-name dan --feature."
+    echo "   Contoh: ./scripts/lb.sh --db-name=db1 --feature=RTIMOR generate-master"
     exit 1
   fi
 
@@ -154,11 +154,11 @@ if [ "$OPERATION" = "generate-master" ]; then
 
   echo "═══════════════════════════════════════════════"
   echo " generate-master"
-  echo " DB     : $DB_NAME"
-  echo " Ver    : $DB_VER"
-  echo " Mode   : $STRUCT_MODE"
-  echo " Src    : $CHANGES_DIR"
-  echo " Out    : $MASTER_XML"
+  echo " DB      : $DB_NAME"
+  echo " Feature : $DB_FEATURE"
+  echo " Mode    : $STRUCT_MODE"
+  echo " Src     : $CHANGES_DIR"
+  echo " Out     : $MASTER_XML"
   echo "═══════════════════════════════════════════════"
 
   # Kumpulkan file .sql secara terurut
@@ -184,8 +184,8 @@ if [ "$OPERATION" = "generate-master" ]; then
     <!--
         File ini di-generate OTOMATIS.
         db-name : $DB_NAME
-        ver     : $DB_VER
-        perintah: scripts/lb.sh [db-name] [ver] generate-master
+        feature : $DB_FEATURE
+        perintah: scripts/lb.sh [db-name] [feature] generate-master
 
         JANGAN diedit manual - perubahan akan tertimpa.
 
@@ -201,7 +201,7 @@ EOF
 
   for SQL_FILE in "${SQL_FILES[@]}"; do
     PREFIX=$(echo "$SQL_FILE" | grep -oE '^[0-9]+')
-    CHANGESET_ID="${DB_VER}-${SQL_FILE%.sql}"
+    CHANGESET_ID="${DB_FEATURE}-${SQL_FILE%.sql}"
 
     ROLLBACK_FILE=""
     if [ -d "$ROLLBACK_DIR" ]; then
@@ -354,7 +354,7 @@ if [[ "$OPERATION" == "generateChangeLog" || "$OPERATION" == "generateChangelog"
   if [ "$HAS_CHANGELOG_ARG" = false ]; then
     echo "❌ Perintah generateChangeLog memerlukan file tujuan baru."
     echo "   Contoh:"
-    echo "   ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 generateChangeLog \\"
+    echo "   ./scripts/lb.sh --external --db-name=db1 --feature=RTIMOR generateChangeLog \\"
     echo "     --changelog-file=changes/000-baseline.sql"
     exit 1
   fi
