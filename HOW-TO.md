@@ -18,9 +18,11 @@ Panduan lengkap penggunaan Liquibase dari nol — semua skenario, semua kasus.
 10. [Multi Database & Multi Version](#10-multi-database--multi-version)
 11. [Perintah Pembantu Lainnya](#11-perintah-pembantu-lainnya)
 12. [Konfigurasi via .env](#12-konfigurasi-via-env)
-13. [GitHub Actions (CI/CD)](#13-github-actions-cicd)
-14. [Troubleshooting](#14-troubleshooting)
-15. [Referensi Perintah Lengkap](#15-referensi-perintah-lengkap)
+13. [Atlassian Bamboo CI/CD](#13-atlassian-bamboo-cicd)
+14. [Strategi Multi-DB & Multi-Server di CI/CD](#14-strategi-multi-db--multi-server-di-cicd)
+15. [GitHub Actions (CI/CD)](#15-github-actions-cicd)
+16. [Troubleshooting](#16-troubleshooting)
+17. [Referensi Perintah Lengkap](#17-referensi-perintah-lengkap)
 
 ---
 
@@ -504,9 +506,147 @@ DB_DB_PAYMENT_PASS=password_rahasia
 > [!CAUTION]
 > **Jangan pernah commit file `.env` ke Git!** File ini sudah di-ignore di `.gitignore`.
 
+## 13. Atlassian Bamboo CI/CD
+
+Mengintegrasikan Liquibase dengan Bamboo sangat mudah karena kita menggunakan script helper `lb.sh`.
+
+### Alur Kerja (Build & Deploy)
+
+1. **Build Plan (CI):** Dijalankan otomatis untuk validasi file SQL & XML pada Pull Request/Commit.
+2. **Deployment Project (CD):** Digunakan untuk rilis (`update`) ke database target (Staging/Production).
+
+### Setup Task di Bamboo
+
+#### A. Task pada Build Plan (Tahap Validasi)
+* **Type:** Script Task (Interpreter: Shell/Bash)
+* **Script Body:**
+  ```bash
+  # 1. Pastikan XML up-to-date
+  ./scripts/lb.sh --db-name=db1 --ver=v.1.0 generate-master
+
+  # 2. Validasi format XML/SQL
+  ./scripts/lb.sh --db-name=db1 --ver=v.1.0 validate
+
+  # 3. Dry-run updateSQL ke database testing
+  ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 updateSQL
+  ```
+
+#### B. Task pada Deployment Project (Tahap Eksekusi)
+* **Type:** Script Task (Interpreter: Shell/Bash)
+* **Script Body:**
+  ```bash
+  # Inject kredensial dari Bamboo Environment Variables (gunakan tipe Password agar ter-masking)
+  export EXT_DB_HOST="${bamboo.db.host}"
+  export EXT_DB_PORT="${bamboo.db.port}"
+  export EXT_DB_USER="${bamboo.db.username}"
+  export EXT_DB_PASS="${bamboo.db.password}"
+
+  # Jalankan migrasi
+  ./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 --db="${bamboo.db.name}" update
+  ```
+
 ---
 
-## 13. GitHub Actions (CI/CD)
+## 14. Strategi Multi-DB & Multi-Server di CI/CD
+
+### Skenario 1 — Satu Database tapi Banyak Server (Dev -> Staging -> Prod)
+
+Gunakan fitur **Bamboo Deployment Environments**. Buat environment berbeda (*Staging*, *Production*) dan berikan variabel yang sesuai pada masing-masing environment:
+- **Environment Staging:** `bamboo.db.host=staging-db.local`
+- **Environment Production:** `bamboo.db.host=prod-db.local`
+
+Script task tetap generic dan otomatis berjalan di server tujuan sesuai environment yang kamu rilis.
+
+### Skenario 2 — Banyak Database Berbeda di Banyak Server (Microservices)
+
+#### Skenario A: Menggunakan File `.env` Multi-DB (Berurutan)
+Definisikan semua target server di dalam file `.env` agen Bamboo menggunakan format `DB_{NAMA_DB}_{FIELD}`:
+```env
+DB_DB1_HOST=172.24.169.100
+DB_DB1_NAME=db1_prod
+# ...
+DB_DB_PAYMENT_HOST=172.24.169.105
+DB_DB_PAYMENT_NAME=payment_prod
+# ...
+```
+Lalu panggil script secara berurutan:
+```bash
+./scripts/lb.sh --external --db-name=db1 --ver=v.1.0 update
+./scripts/lb.sh --external --db-name=db_payment --ver=v.1.0 update
+```
+
+#### Skenario B: Menggunakan Jobs Paralel Bamboo (Cepat)
+Buat beberapa **Jobs** independen yang berjalan secara parallel di bawah satu Stage Bamboo. Masing-masing Job akan menjalankan migrasi database-nya sendiri secara bersamaan, sehingga menghemat waktu deploy.
+
+### Skenario 3 — Banyak Database Berbeda di Satu Server MySQL yang Sama
+
+Jika semua database berada di satu server MySQL (berbagi host, port, user, dan password yang sama), kamu hanya perlu mendefinisikan host & kredensial sekali saja di bagian global fallback `.env`:
+
+```env
+# Global Fallback (Server yang sama)
+EXT_DB_HOST=172.24.169.100
+EXT_DB_PORT=3306
+EXT_DB_USER=root
+EXT_DB_PASS=password_rahasia
+
+# Petakan nama DB target jika berbeda dengan nama folder
+DB_DB1_NAME=mbtl_int_coba
+DB_DB2_NAME=mbtl_payment
+```
+
+Lalu jalankan menggunakan looping di Bash task Bamboo:
+```bash
+DATABASES=("db1" "db2" "db3")
+
+for db in "${DATABASES[@]}"; do
+  echo "Running migration for database: $db"
+  ./scripts/lb.sh --external --db-name="$db" --ver=v.1.0 update
+done
+```
+
+### Skenario 4 — Deteksi Otomatis & Deploy Statis Berdasarkan Commit (SANGAT DIREKOMENDASIKAN)
+
+Jika kamu ingin konfigurasi YAML Bamboo kamu bersifat **statis** (tidak perlu diganti-ganti lagi selamanya), gunakan script detektor `deploy-changed.sh`. Script ini secara otomatis membandingkan git diff dari commit terakhir, mencari database mana yang berubah, lalu menjalankan deploy hanya ke database & IP tersebut.
+
+#### 1. Cara Konfigurasi `.env` di Agen Bamboo:
+Definisikan semua variabel koneksi database per-layanan:
+```env
+# Database db1
+DB_DB1_HOST=172.24.169.100
+DB_DB1_USER=root
+DB_DB1_PASS=securepass_db1
+
+# Database db_payment
+DB_DB_PAYMENT_HOST=172.24.169.105
+DB_DB_PAYMENT_USER=root
+DB_DB_PAYMENT_PASS=securepass_payment
+```
+
+#### 2. Jalankan di Task Bamboo (Script Task):
+Cukup panggil script detektor dengan menyertakan range commit (di Bamboo, kita bisa bandingkan `HEAD~1`):
+```bash
+./scripts/deploy-changed.sh HEAD~1
+```
+
+Script akan mengeluarkan output seperti berikut jika mendeteksi adanya penambahan SQL di folder `db1`:
+```
+==================================================
+ Database Deployment Detector
+ Commit Range: HEAD~1
+==================================================
+Database yang terdeteksi mengalami perubahan:
+  📍 Database: db1  |  Versi: v.1.0
+==================================================
+🚀 Memulai deploy untuk database: db1 (v.1.0)...
+...
+✅ Berhasil deploy database: db1 (v.1.0)
+--------------------------------------------------
+🎉 Semua proses deployment database selesai!
+```
+
+---
+
+## 15. GitHub Actions (CI/CD)
 
 Setiap push ke branch `main` atau `staging` dapat dikonfigurasi untuk menjalankan migrasi skema database secara otomatis.
 
@@ -519,7 +659,7 @@ Buka repository GitHub → **Settings** → **Secrets and variables** → **Acti
 
 ---
 
-## 14. Troubleshooting
+## 16. Troubleshooting
 
 ### ❌ `SAXParseException: The string "--" is not permitted within comments`
 
@@ -538,7 +678,7 @@ Buka repository GitHub → **Settings** → **Secrets and variables** → **Acti
 
 ---
 
-## 15. Referensi Perintah Lengkap
+## 17. Referensi Perintah Lengkap
 
 ### Format Perintah
 
